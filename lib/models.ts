@@ -10,10 +10,10 @@ export interface ModelSpec {
 }
 
 export const SUPPORTED_MODELS: ModelSpec[] = [
-  // 1. Gemini 3.7 Flash
+  // 1. Gemini 3.7 Flash Series
   {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash",
+    id: "gemini-3.7-flash-high",
+    name: "Gemini 3.7 Flash (High)",
     wireModel: "gemini-3.7-flash-tiered",
     defaultThinkingBudget: 24576,
     description: "Flagship hybrid reasoning model with high thinking budget.",
@@ -22,8 +22,8 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.7-flash:medium",
-    name: "Gemini 3.7 Flash",
+    id: "gemini-3.7-flash-medium",
+    name: "Gemini 3.7 Flash (Medium)",
     wireModel: "gemini-3.7-flash-tiered",
     defaultThinkingBudget: 8192,
     description: "Balanced multimodal and coding reasoning.",
@@ -32,8 +32,8 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.7-flash:low",
-    name: "Gemini 3.7 Flash",
+    id: "gemini-3.7-flash-low",
+    name: "Gemini 3.7 Flash (Low)",
     wireModel: "gemini-3.7-flash-tiered",
     defaultThinkingBudget: 2048,
     description: "Snappy conversational reasoning tier.",
@@ -42,20 +42,20 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.7-flash:fast",
-    name: "Gemini 3.7 Flash",
+    id: "gemini-3.7-flash-fast",
+    name: "Gemini 3.7 Flash (Fast)",
     wireModel: "gemini-3.7-flash-tiered",
     defaultThinkingBudget: 0,
-    description: "Instantaneous zero-thinking generation for rapid tool calling.",
+    description: "Zero-thinking ultra-low latency generation for tool calling.",
     tier: "Fast",
     speed: "Ultra-Fast",
     contextWindow: 1048576,
   },
 
-  // 2. Gemini 3.6 Flash
+  // 2. Gemini 3.6 Flash Series
   {
-    id: "gemini-3.6-flash",
-    name: "Gemini 3.6 Flash",
+    id: "gemini-3.6-flash-high",
+    name: "Gemini 3.6 Flash (High)",
     wireModel: "gemini-3.6-flash-high",
     defaultThinkingBudget: 16384,
     description: "High-speed reasoning model for coding & agent tasks.",
@@ -64,8 +64,8 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.6-flash:medium",
-    name: "Gemini 3.6 Flash",
+    id: "gemini-3.6-flash-medium",
+    name: "Gemini 3.6 Flash (Medium)",
     wireModel: "gemini-3.6-flash-medium",
     defaultThinkingBudget: 8192,
     description: "Optimized speed & balanced reasoning.",
@@ -74,8 +74,8 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.6-flash:low",
-    name: "Gemini 3.6 Flash",
+    id: "gemini-3.6-flash-low",
+    name: "Gemini 3.6 Flash (Low)",
     wireModel: "gemini-3.6-flash-low",
     defaultThinkingBudget: 2048,
     description: "Low-latency fast execution tier.",
@@ -84,7 +84,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
 
-  // 3. Gemini 3.1 Pro
+  // 3. Gemini 3.1 Pro Series
   {
     id: "gemini-3.1-pro",
     name: "Gemini 3.1 Pro",
@@ -96,8 +96,8 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.1-pro:low",
-    name: "Gemini 3.1 Pro",
+    id: "gemini-3.1-pro-low",
+    name: "Gemini 3.1 Pro (Low)",
     wireModel: "gemini-3.1-pro-low",
     defaultThinkingBudget: 4096,
     description: "Compact pro tier for structured reasoning.",
@@ -130,7 +130,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
 
   // 5. GPT-OSS 120B
   {
-    id: "gpt-oss-120b",
+    id: "gpt-oss-120b-medium",
     name: "GPT-OSS 120B (Medium)",
     wireModel: "gpt-oss-120b-medium",
     defaultThinkingBudget: 8192,
@@ -145,44 +145,38 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match (supports both colon and hyphen syntax)
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean || m.id.replace(':', '-') === clean);
+  // Exact ID match
+  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {
     return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
   }
 
-  // Gemini 3.7 variations
-  if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high') {
+  // Gemini 3.7 Flash variants (high, medium/mid, low, fast)
+  if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high' || clean === 'gemini-3.7-flash') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
   }
-  if (clean === 'gemini-3.7-flash-medium' || clean === 'gemini-3.7-flash:medium' || clean === 'gemini-3.7-flash-med') {
+  if (clean === 'gemini-3.7-flash-medium' || clean === 'gemini-3.7-flash-mid' || clean === 'gemini-3.7-flash:medium' || clean === 'gemini-3.7-flash:mid') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
   }
   if (clean === 'gemini-3.7-flash-low' || clean === 'gemini-3.7-flash:low') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
   }
-  if (clean === 'gemini-3.7-flash-fast' || clean === 'gemini-3.7-flash:fast' || clean === 'gemini-3.7-flash:off') {
+  if (clean === 'gemini-3.7-flash-fast' || clean === 'gemini-3.7-flash:fast' || clean === 'gemini-3.7-flash-off') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
   }
-  if (clean === 'gemini-3.7-flash' || clean === 'gemini-3.7') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
-  }
 
-  // Gemini 3.6 variations
-  if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high') {
+  // Gemini 3.6 Flash variants (high, medium/mid, low)
+  if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high' || clean === 'gemini-3.6-flash') {
     return { wireModel: 'gemini-3.6-flash-high', defaultThinkingBudget: 16384 };
   }
-  if (clean === 'gemini-3.6-flash-medium' || clean === 'gemini-3.6-flash:medium') {
+  if (clean === 'gemini-3.6-flash-medium' || clean === 'gemini-3.6-flash-mid' || clean === 'gemini-3.6-flash:medium' || clean === 'gemini-3.6-flash:mid') {
     return { wireModel: 'gemini-3.6-flash-medium', defaultThinkingBudget: 8192 };
   }
   if (clean === 'gemini-3.6-flash-low' || clean === 'gemini-3.6-flash:low') {
     return { wireModel: 'gemini-3.6-flash-low', defaultThinkingBudget: 2048 };
   }
-  if (clean === 'gemini-3.6-flash' || clean === 'gemini-3.6') {
-    return { wireModel: 'gemini-3.6-flash-high', defaultThinkingBudget: 16384 };
-  }
 
-  // Gemini 3.1 Pro variations
+  // Gemini 3.1 Pro variants
   if (clean === 'gemini-3.1-pro-low' || clean === 'gemini-3.1-pro:low') {
     return { wireModel: 'gemini-3.1-pro-low', defaultThinkingBudget: 4096 };
   }
@@ -191,7 +185,7 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   }
 
   // Claude models
-  if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6' || clean === 'claude-sonnet') {
+  if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6') {
     return { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 };
   }
   if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus') {
@@ -199,11 +193,11 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   }
 
   // GPT-OSS 120B
-  if (clean === 'gpt-oss-120b' || clean === 'gpt-oss-120b-medium' || clean === 'gpt-oss-120b:medium') {
+  if (clean === 'gpt-oss-120b-medium' || clean === 'gpt-oss-120b' || clean === 'gpt-oss-120b-mid') {
     return { wireModel: 'gpt-oss-120b-medium', defaultThinkingBudget: 8192 };
   }
 
-  // Exact Google internal wire model identifier
+  // Google internal wire format pass-through
   if (clean.startsWith('publishers/google/models/') || clean.startsWith('models/')) {
     return { wireModel: clean, defaultThinkingBudget: 8192 };
   }

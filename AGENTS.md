@@ -13,32 +13,32 @@
 
 `antigravity-openai-proxy` is a lightweight, zero-tampering, high-concurrency serverless gateway deployed on Vercel. It translates standard **OpenAI API protocol requests** (`/v1/chat/completions` and `/v1/models`) into **Google Antigravity's internal CloudCode PA wire protocol** (`daily-cloudcode-pa.googleapis.com` / `cloudcode-pa.googleapis.com`).
 
-Unlike roleplay-focused proxies, this proxy is engineered for:
-* **Coding Agents & SWE-Bench / Evaluators** (DeepSeek Harness, Cline, OpenClaw, Continue, Aider).
+Key Capabilities:
+* **Coding Agents, SWE-Bench & Evaluators** (DeepSeek Harness, Cline, OpenClaw, Continue, Aider).
 * **Native Tool & Function Calling** (bi-directional parameter and schema translation).
 * **DeepSeek R1 Thinking Format** (streams internal reasoning tokens inside `choices[0].delta.reasoning_content`).
 * **Pure Zero-Tampering Pass-Through** (0 system prompts added, 0 user injections, 0 persona anchors).
 
 ---
 
-## 2. Model Catalog & Wire Specifications
+## 2. Explicit Native Model Catalog & Thinking Tiers
 
-All models and tiers correspond 1:1 with Google Antigravity's official internal model lineup:
+All models are exposed with explicit standalone IDs for high, medium, low, and fast tiers:
 
 | Model ID | Name | Tier | Speed | Thinking Budget | Context Window | Internal Wire Model |
 |---|---|---|---|---|---|---|
-| `gemini-3.7-flash` | Gemini 3.7 Flash | **High** | Fast | 24,576 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
-| `gemini-3.7-flash:medium` | Gemini 3.7 Flash | **Medium** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
-| `gemini-3.7-flash:low` | Gemini 3.7 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
-| `gemini-3.7-flash:fast` | Gemini 3.7 Flash | **Fast (Off)** | Ultra-Fast | 0 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
-| `gemini-3.6-flash` | Gemini 3.6 Flash | **High** | Fast | 16,384 Tokens | 1,048,576 | `gemini-3.6-flash-high` |
-| `gemini-3.6-flash:medium` | Gemini 3.6 Flash | **Medium** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.6-flash-medium` |
-| `gemini-3.6-flash:low` | Gemini 3.6 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.6-flash-low` |
+| `gemini-3.7-flash-high` | Gemini 3.7 Flash | **High** | Fast | 24,576 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
+| `gemini-3.7-flash-medium` | Gemini 3.7 Flash | **Medium (Mid)** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
+| `gemini-3.7-flash-low` | Gemini 3.7 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
+| `gemini-3.7-flash-fast` | Gemini 3.7 Flash | **Fast (Off)** | Ultra-Fast | 0 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
+| `gemini-3.6-flash-high` | Gemini 3.6 Flash | **High** | Fast | 16,384 Tokens | 1,048,576 | `gemini-3.6-flash-high` |
+| `gemini-3.6-flash-medium` | Gemini 3.6 Flash | **Medium (Mid)** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.6-flash-medium` |
+| `gemini-3.6-flash-low` | Gemini 3.6 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.6-flash-low` |
 | `gemini-3.1-pro` | Gemini 3.1 Pro | **Agent** | Deep | 32,768 Tokens | 1,048,576 | `gemini-pro-agent` |
-| `gemini-3.1-pro:low` | Gemini 3.1 Pro | **Low** | Medium | 4,096 Tokens | 1,048,576 | `gemini-3.1-pro-low` |
+| `gemini-3.1-pro-low` | Gemini 3.1 Pro | **Low** | Medium | 4,096 Tokens | 1,048,576 | `gemini-3.1-pro-low` |
 | `claude-sonnet-4-6` | Claude Sonnet 4.6 | **Thinking** | Adaptive | 16,384 Tokens | 1,048,576 | `claude-sonnet-4-6` |
 | `claude-opus-4-6-thinking`| Claude Opus 4.6 | **Thinking** | Deep | 16,384 Tokens | 1,048,576 | `claude-opus-4-6-thinking` |
-| `gpt-oss-120b` | GPT-OSS 120B | **Medium** | Fast | 8,192 Tokens | 1,048,576 | `gpt-oss-120b-medium` |
+| `gpt-oss-120b-medium` | GPT-OSS 120B | **Medium** | Fast | 8,192 Tokens | 1,048,576 | `gpt-oss-120b-medium` |
 
 ---
 
@@ -104,7 +104,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gemini-3.7-flash",  # or "claude-sonnet-4-6", "gemini-3.1-pro"
+    model="gemini-3.7-flash-high",  # or "gemini-3.7-flash-medium", "gemini-3.6-flash-high", "claude-sonnet-4-6"
     messages=[{"role": "user", "content": "Write a binary search in Rust"}],
     stream=True
 )
@@ -123,8 +123,8 @@ curl -X POST "https://antigravity-openai-proxy.vercel.app/v1/chat/completions" \
   -H "Authorization: Bearer KARS-2010915" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3.7-flash",
-    "messages": [{"role": "user", "content": "Hello Antigravity"}],
+    "model": "gemini-3.7-flash-high",
+    "messages": [{"role": "user", "content": "Explain quicksort."}],
     "stream": true
   }'
 ```

@@ -160,3 +160,37 @@ antigravity-openai-proxy/
 ├── PROJECT_SUMMARY.md                  # This architecture document
 └── README.md                           # Public GitHub documentation
 ```
+
+
+---
+
+## 7. Git Push Operational Protocol (How to Push Commits)
+
+### Why Standard `git push` Fails (403 Forbidden)
+The local Windows Git Credential Manager defaults to the `agentblox40` GitHub account. However, this repository (`Kars32/antigravity-openai-proxy`) is owned by the **`Kars32`** account. If an agent runs plain `git push origin main`, GitHub returns:
+```
+remote: Permission to Kars32/antigravity-openai-proxy.git denied to agentblox40.
+fatal: unable to access '...': The requested URL returned error: 403
+```
+
+### The Proven 3-Step Push Protocol
+Whenever pushing commits to this repository, ALWAYS execute this PowerShell command block:
+
+```powershell
+# 1. Fetch Kars32 active token from GitHub CLI
+$token = gh auth token --user Kars32
+
+# 2. Authenticate the remote URL and push
+git remote set-url origin "https://Kars32:$token@github.com/Kars32/antigravity-openai-proxy.git"
+git add .
+git commit -m "Your descriptive commit message"
+git push origin main
+
+# 3. Clean up remote URL so token is never saved in .git/config
+git remote set-url origin "https://github.com/Kars32/antigravity-openai-proxy.git"
+```
+
+### GitHub Push Protection (Secret Scanning Rule GH013)
+GitHub blocks pushes if any tracked file (e.g. `.md`, `.ts`) contains raw Google OAuth refresh tokens (starting with `1//...`).
+* **Rule**: Keep real tokens **ONLY** inside `.env.local` (which is `.gitignore`d).
+* In all markdown documentation, use placeholders like `ACCOUNT_1_REFRESH_TOKEN=1//<your-refresh-token>`.

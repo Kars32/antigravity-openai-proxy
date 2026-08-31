@@ -259,6 +259,21 @@ export async function handleChatCompletions(req: NextRequest) {
                         }
 
                         if (part.functionCall) {
+                          const callId = `call_${crypto.randomUUID().slice(0, 8)}`;
+                          const toolCallObj: any = {
+                            index: toolCallIndex++,
+                            id: callId,
+                            type: 'function',
+                            function: {
+                              name: part.functionCall.name,
+                              arguments: JSON.stringify(part.functionCall.args || {}),
+                            },
+                          };
+                          const sig = part.thoughtSignature || part.thought_signature;
+                          if (sig) {
+                            toolCallObj.thought_signature = sig;
+                          }
+
                           controller.enqueue(
                             encoder.encode(
                               `data: ${JSON.stringify({
@@ -270,17 +285,7 @@ export async function handleChatCompletions(req: NextRequest) {
                                   {
                                     index: 0,
                                     delta: {
-                                      tool_calls: [
-                                        {
-                                          index: toolCallIndex++,
-                                          id: `call_${crypto.randomUUID().slice(0, 8)}`,
-                                          type: 'function',
-                                          function: {
-                                            name: part.functionCall.name,
-                                            arguments: JSON.stringify(part.functionCall.args || {}),
-                                          },
-                                        },
-                                      ],
+                                      tool_calls: [toolCallObj],
                                     },
                                     finish_reason: 'tool_calls',
                                   },
@@ -351,14 +356,19 @@ export async function handleChatCompletions(req: NextRequest) {
                 contentText += part.text;
               }
               if (part.functionCall) {
-                toolCalls.push({
+                const toolCallObj: any = {
                   id: `call_${crypto.randomUUID().slice(0, 8)}`,
                   type: 'function',
                   function: {
                     name: part.functionCall.name,
                     arguments: JSON.stringify(part.functionCall.args || {}),
                   },
-                });
+                };
+                const sig = part.thoughtSignature || part.thought_signature;
+                if (sig) {
+                  toolCallObj.thought_signature = sig;
+                }
+                toolCalls.push(toolCallObj);
               }
             }
           } catch {}

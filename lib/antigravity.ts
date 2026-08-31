@@ -205,13 +205,41 @@ export function transformOpenAIToAntigravity(
         } catch {
           args = { raw: tc.function?.arguments };
         }
+
+        const thoughtSignature = (tc as any).thought_signature
+          || (tc as any).thoughtSignature
+          || (tc as any).extra?.thought_signature
+          || 'skip_thought_signature_validator';
+
         parts.push({
           functionCall: {
             name: tc.function?.name || 'function',
             args
-          }
+          },
+          thoughtSignature,
+          thought_signature: thoughtSignature
         });
       }
+      rawContents.push({ role: 'model', parts });
+      continue;
+    }
+
+    if (m.role === 'assistant' && (m as any).function_call) {
+      const fc = (m as any).function_call;
+      let args = {};
+      try {
+        args = typeof fc.arguments === 'string' ? JSON.parse(fc.arguments) : (fc.arguments || {});
+      } catch {
+        args = { raw: fc.arguments };
+      }
+      parts.push({
+        functionCall: {
+          name: fc.name || 'function',
+          args
+        },
+        thoughtSignature: 'skip_thought_signature_validator',
+        thought_signature: 'skip_thought_signature_validator'
+      });
       rawContents.push({ role: 'model', parts });
       continue;
     }

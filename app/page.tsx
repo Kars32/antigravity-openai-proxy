@@ -14,7 +14,7 @@ export default function AntigravityOpenAIControlCenter() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Dashboard Navigation
-  const [activeTab, setActiveTab] = useState<'quickstart' | 'models' | 'test' | 'accounts'>('quickstart');
+  const [activeTab, setActiveTab] = useState<'quickstart' | 'models' | 'test' | 'accounts'>('models');
   const [codeTab, setCodeTab] = useState<'python' | 'curl' | 'harness' | 'node'>('python');
 
   // Gateway Status & Telemetry
@@ -24,7 +24,7 @@ export default function AntigravityOpenAIControlCenter() {
 
   // Playground / Test Console State
   const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
-  const [testPrompt, setTestPrompt] = useState('Write a Python function to solve quicksort with clean type hints.');
+  const [testPrompt, setTestPrompt] = useState('Write a concise, robust type-safe LRU Cache in TypeScript with O(1) get and set operations.');
   const [testOutput, setTestOutput] = useState('');
   const [testThoughts, setTestThoughts] = useState('');
   const [isTesting, setIsTesting] = useState(false);
@@ -259,15 +259,16 @@ client = OpenAI(
     api_key="${apiKey}"
 )
 
+# Call any Antigravity internal model directly:
 response = client.chat.completions.create(
-    model="gemini-3.7-flash",
+    model="gemini-3.7-flash",  # or "claude-sonnet-4-6", "gemini-3.1-pro", "gpt-oss-120b"
     messages=[{"role": "user", "content": "Write a binary search function in Python"}],
     stream=True
 )
 
 for chunk in response:
     delta = chunk.choices[0].delta
-    # Access thinking tokens
+    # DeepSeek R1 format reasoning stream
     if hasattr(delta, "reasoning_content") and delta.reasoning_content:
         print(delta.reasoning_content, end="", flush=True)
     if delta.content:
@@ -286,7 +287,7 @@ for chunk in response:
 export OPENAI_BASE_URL="${DOMAIN}/v1"
 export OPENAI_API_KEY="${apiKey}"
 
-# Run evaluation:
+# Run evaluation with Antigravity:
 python -m eval.run_bench --model deepseek-reasoner`;
 
   const nodeCode = `import OpenAI from 'openai';
@@ -305,6 +306,49 @@ const stream = await openai.chat.completions.create({
 for await (const chunk of stream) {
   process.stdout.write(chunk.choices[0]?.delta?.content || '');
 }`;
+
+  const ANTIGRAVITY_MODELS_HIERARCHY = [
+    {
+      group: 'Google Gemini 3.7 Series',
+      items: [
+        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', tier: 'High', speed: 'Fast', tokens: '24,576 Tokens', desc: 'Flagship hybrid reasoning model with high thinking budget.' },
+        { id: 'gemini-3.7-flash-medium', name: 'Gemini 3.7 Flash', tier: 'Medium', speed: 'Fast', tokens: '8,192 Tokens', desc: 'Balanced multimodal and coding reasoning.' },
+        { id: 'gemini-3.7-flash-low', name: 'Gemini 3.7 Flash', tier: 'Low', speed: 'Fast', tokens: '2,048 Tokens', desc: 'Snappy response tier with lightweight thinking.' },
+        { id: 'gemini-3.7-flash-fast', name: 'Gemini 3.7 Flash', tier: 'Fast (Off)', speed: 'Ultra-Fast', tokens: '0 Tokens', desc: 'Zero-thinking ultra-low latency generation.' },
+      ]
+    },
+    {
+      group: 'Google Gemini 3.6 Series',
+      items: [
+        { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', tier: 'High', speed: 'Fast', tokens: '16,384 Tokens', desc: 'High-speed reasoning model for coding & agent workflows.' },
+        { id: 'gemini-3.6-flash-medium', name: 'Gemini 3.6 Flash', tier: 'Medium', speed: 'Fast', tokens: '8,192 Tokens', desc: 'Optimized speed with balanced thinking.' },
+        { id: 'gemini-3.6-flash-low', name: 'Gemini 3.6 Flash', tier: 'Low', speed: 'Fast', tokens: '2,048 Tokens', desc: 'Fast low-latency execution tier.' },
+      ]
+    },
+    {
+      group: 'Google Gemini 3.1 Pro Series',
+      items: [
+        { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', tier: 'Agent / High', speed: 'Deep', tokens: '32,768 Tokens', desc: 'Deep agentic reasoning model for complex repository architecture.' },
+        { id: 'gemini-3.1-pro-low', name: 'Gemini 3.1 Pro', tier: 'Low', speed: 'Medium', tokens: '4,096 Tokens', desc: 'Compact pro reasoning tier.' },
+      ]
+    },
+    {
+      group: 'Anthropic Claude Series',
+      items: [
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', tier: 'Thinking', speed: 'Adaptive', tokens: '16,384 Tokens', desc: 'High-performance Anthropic model for software engineering & refactoring.' },
+        { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6 (Thinking)', tier: 'Thinking', speed: 'Deep', tokens: '16,384 Tokens', desc: 'Anthropic flagship deep reasoning and creative writing engine.' },
+      ]
+    },
+    {
+      group: 'Open-Weights & Aliases',
+      items: [
+        { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', tier: 'Medium', speed: 'Fast', tokens: '8,192 Tokens', desc: 'Open-weights 120B reasoning model hosted on Google CloudCode.' },
+        { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner (Alias)', tier: 'Alias', speed: 'High', tokens: '24,576 Tokens', desc: 'DeepSeek R1 reasoning alias routed to Gemini 3.7 High.' },
+        { id: 'deepseek-chat', name: 'DeepSeek Chat (Alias)', tier: 'Alias', speed: 'Fast', tokens: '0 Tokens', desc: 'DeepSeek V3 chat alias routed to Gemini 3.7 Fast.' },
+        { id: 'gpt-4o', name: 'GPT-4o (Alias)', tier: 'Alias', speed: 'Fast', tokens: '8,192 Tokens', desc: 'Universal compatibility alias routed to Gemini 3.7 Flash.' },
+      ]
+    }
+  ];
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px', minHeight: '100vh', color: '#f4f4f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -367,8 +411,8 @@ for await (const chunk of stream) {
       {/* Tabs Navigation */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
         {[
-          { id: 'quickstart', label: '⚡ Quickstart & Setup' },
           { id: 'models', label: '🧠 Models Catalog' },
+          { id: 'quickstart', label: '⚡ Quickstart & Setup' },
           { id: 'test', label: '🔬 Interactive Test Console' },
           { id: 'accounts', label: '📊 Account Pool Health' },
         ].map(tab => (
@@ -391,7 +435,50 @@ for await (const chunk of stream) {
         ))}
       </div>
 
-      {/* TAB 1: Quickstart Code Snippets */}
+      {/* TAB 1: Models Catalog (Exact Hierarchy matching Antigravity IDE) */}
+      {activeTab === 'models' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {ANTIGRAVITY_MODELS_HIERARCHY.map(group => (
+            <div key={group.group}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
+                {group.group}
+              </h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+                {group.items.map(m => (
+                  <div key={m.id} style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 10, padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{m.name}</span>
+                        <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, backgroundColor: '#27272a', color: '#38bdf8', fontWeight: 600 }}>
+                          {m.tier}
+                        </span>
+                        {m.speed && (
+                          <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, backgroundColor: '#1c1917', color: '#fb923c', border: '1px solid #44403c' }}>
+                            {m.speed}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#71717a' }}>{m.tokens}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: '#a1a1aa', margin: '0 0 12px 0', lineHeight: 1.4 }}>{m.desc}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #1f1f23' }}>
+                      <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
+                      <button
+                        onClick={() => copyToClipboard(m.id, m.id)}
+                        style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
+                      >
+                        {copiedField === m.id ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* TAB 2: Quickstart Code Snippets */}
       {activeTab === 'quickstart' && (
         <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -437,42 +524,6 @@ for await (const chunk of stream) {
         </div>
       )}
 
-      {/* TAB 2: Models Catalog */}
-      {activeTab === 'models' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-          {[
-            { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', desc: 'Hybrid reasoning and fast multimodal flagship.', thinking: '8,192 Tokens', tier: 'Flagship' },
-            { id: 'gemini-3.7-flash-thinking', name: 'Gemini 3.7 Flash (Extended)', desc: 'Maximum thinking token budget for complex math & SWE.', thinking: '24,576 Tokens', tier: 'Reasoning' },
-            { id: 'gemini-3.7-flash:fast', name: 'Gemini 3.7 Flash (Fast)', desc: 'Zero-thinking ultra-low latency generation for tools.', thinking: '0 Tokens', tier: 'Fast' },
-            { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', desc: 'Google agentic model for deep code repository analysis.', thinking: '32,768 Tokens', tier: 'Pro' },
-            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', desc: 'High-performance Anthropic model for software engineering.', thinking: '16,384 Tokens', tier: 'Anthropic' },
-            { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6', desc: 'Anthropic flagship deep reasoning and creative engine.', thinking: '16,384 Tokens', tier: 'Anthropic' },
-            { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner (Alias)', desc: 'DeepSeek R1 reasoning alias routed to Gemini 3.7 High.', thinking: '24,576 Tokens', tier: 'Alias' },
-            { id: 'deepseek-chat', name: 'DeepSeek Chat (Alias)', desc: 'DeepSeek V3 fast chat alias routed to Gemini 3.7 Fast.', thinking: '0 Tokens', tier: 'Alias' },
-            { id: 'gpt-4o', name: 'GPT-4o (Alias)', desc: 'Universal OpenAI alias routed to Gemini 3.7 Flash.', thinking: '8,192 Tokens', tier: 'Alias' },
-          ].map(m => (
-            <div key={m.id} style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 10, padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{m.name}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa' }}>
-                  {m.tier}
-                </span>
-              </div>
-              <p style={{ fontSize: 12, color: '#a1a1aa', margin: '0 0 12px 0' }}>{m.desc}</p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #1f1f23' }}>
-                <code style={{ fontSize: 12, color: '#38bdf8' }}>{m.id}</code>
-                <button
-                  onClick={() => copyToClipboard(m.id, m.id)}
-                  style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
-                >
-                  {copiedField === m.id ? '✓' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* TAB 3: Interactive Testing Console */}
       {activeTab === 'test' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
@@ -486,15 +537,31 @@ for await (const chunk of stream) {
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
               >
-                <option value="gemini-3.7-flash">gemini-3.7-flash (Default Reasoning)</option>
-                <option value="gemini-3.7-flash-thinking">gemini-3.7-flash-thinking (Extended Thinking)</option>
-                <option value="gemini-3.7-flash:fast">gemini-3.7-flash:fast (Zero-Latency Fast)</option>
-                <option value="gemini-3.1-pro">gemini-3.1-pro (Deep Reasoning)</option>
-                <option value="claude-sonnet-4-6">claude-sonnet-4-6 (Anthropic)</option>
-                <option value="claude-opus-4-6-thinking">claude-opus-4-6-thinking (Opus)</option>
-                <option value="deepseek-reasoner">deepseek-reasoner (R1 Alias)</option>
-                <option value="deepseek-chat">deepseek-chat (V3 Alias)</option>
-                <option value="gpt-4o">gpt-4o (Universal Alias)</option>
+                <optgroup label="Gemini 3.7 Flash">
+                  <option value="gemini-3.7-flash">Gemini 3.7 Flash (High - 24k Thinking)</option>
+                  <option value="gemini-3.7-flash-medium">Gemini 3.7 Flash (Medium - 8k Thinking)</option>
+                  <option value="gemini-3.7-flash-low">Gemini 3.7 Flash (Low - 2k Thinking)</option>
+                  <option value="gemini-3.7-flash-fast">Gemini 3.7 Flash (Fast - 0 Thinking)</option>
+                </optgroup>
+                <optgroup label="Gemini 3.6 Flash">
+                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (High - 16k Thinking)</option>
+                  <option value="gemini-3.6-flash-medium">Gemini 3.6 Flash (Medium - 8k Thinking)</option>
+                  <option value="gemini-3.6-flash-low">Gemini 3.6 Flash (Low - 2k Thinking)</option>
+                </optgroup>
+                <optgroup label="Gemini 3.1 Pro">
+                  <option value="gemini-3.1-pro">Gemini 3.1 Pro (Agent - 32k Thinking)</option>
+                  <option value="gemini-3.1-pro-low">Gemini 3.1 Pro (Low - 4k Thinking)</option>
+                </optgroup>
+                <optgroup label="Anthropic Claude">
+                  <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Thinking - 16k)</option>
+                  <option value="claude-opus-4-6-thinking">Claude Opus 4.6 (Thinking - 16k)</option>
+                </optgroup>
+                <optgroup label="Open-Weights & Aliases">
+                  <option value="gpt-oss-120b">GPT-OSS 120B (Medium)</option>
+                  <option value="deepseek-reasoner">DeepSeek Reasoner (Alias)</option>
+                  <option value="deepseek-chat">DeepSeek Chat (Alias)</option>
+                  <option value="gpt-4o">GPT-4o (Alias)</option>
+                </optgroup>
               </select>
             </div>
 

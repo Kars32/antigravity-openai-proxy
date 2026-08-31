@@ -54,12 +54,26 @@ export async function handleChatCompletions(req: NextRequest) {
   const modelId = body.model || 'gemini-3.7-flash';
   const resolved = resolveModel(modelId);
 
+  if (!resolved) {
+    return NextResponse.json(
+      {
+        error: {
+          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.7-flash, gemini-3.7-flash-high, gemini-3.7-flash-medium, gemini-3.7-flash-low, gemini-3.7-flash-fast, gemini-3.7-flash-max, gemini-3.1-pro, gemini-3.5-flash, gemini-2.5-flash, claude-sonnet-4-6, claude-opus-4-6-thinking, gpt-4o.`,
+          type: 'invalid_request_error',
+          param: 'model',
+          code: 'model_not_found',
+        }
+      },
+      { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } }
+    );
+  }
+
   const stream = body.stream === true;
   const accounts = getAccounts();
 
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: { message: 'No Google CloudCode PA accounts configured.', type: 'server_error', code: 500 } },
+      { error: { message: 'No Google CloudCode PA accounts configured in environment variables.', type: 'server_error', code: 500 } },
       { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
     );
   }
@@ -67,44 +81,64 @@ export async function handleChatCompletions(req: NextRequest) {
   const now = Date.now();
   const availableAccounts = accounts.filter(a => a.cooldownUntil <= now);
 
-  if (availableAccounts.length === 0) {
-    const minWaitMs = Math.min(...accounts.map(a => a.cooldownUntil - now));
-    const waitSec = Math.max(1, Math.ceil(minWaitMs / 1000));
+  if (availableAccounts.length === 0 && accounts.length > 0) {
+    const remainingTimes = accounts.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000)));
+    const minWaitSec = Math.min(...remainingTimes);
+    const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    }).format(new Date(now + minWaitSec * 1000)) + ' IST';
+
+    const accountBreakdown = accounts.map(a => `${a.name}: Cooldown (${Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))}s)`).join(' | ');
+
     return NextResponse.json(
       {
         error: {
-          message: `All accounts are cooling down from rate limits. Retry in ${waitSec}s.`,
+          message: `[Proxy Rate Limit]: All Google accounts in pool are cooling down. [${accountBreakdown}]. Refreshing in ${minWaitSec}s (Ready at ${refreshTimeStr}). Please wait ${minWaitSec}s before retrying.`,
           type: 'upstream_rate_limit',
           code: 429,
-          retry_after: waitSec
+          retry_after: minWaitSec,
+          refresh_in_seconds: minWaitSec,
+          ready_at: refreshTimeStr,
+          accounts_status: accounts.map(a => ({
+            name: a.name,
+            status: 'Cooldown',
+            cooldown_remaining_sec: Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))
+          }))
         }
       },
       {
         status: 429,
         headers: {
-          'Retry-After': String(waitSec),
+          'Retry-After': String(minWaitSec),
           'Access-Control-Allow-Origin': '*'
         }
       }
     );
   }
 
-  let primaryAccount = availableAccounts[0];
+  let primaryAccount: any;
   try {
     primaryAccount = pickAccount();
   } catch {
-    primaryAccount = availableAccounts[0];
+    primaryAccount = availableAccounts[0] || accounts[0];
   }
 
   const otherAccounts = accounts.filter(a => a.id !== primaryAccount?.id);
-  const accountsToTry = primaryAccount ? [primaryAccount, ...otherAccounts] : accounts;
+  const orderedAccounts = primaryAccount ? [primaryAccount, ...otherAccounts] : accounts;
+  const accountsToTry = availableAccounts.length > 0
+    ? orderedAccounts.filter(a => availableAccounts.some(avail => avail.id === a.id))
+    : orderedAccounts;
 
   const attemptLogs: { account: string; status: number; error: string }[] = [];
 
   for (const account of accountsToTry) {
     try {
       const accessToken = await getAccessToken(account);
-      const envelope = transformOpenAIToAntigravity(body, resolved!, account.projectId);
+      const envelope = transformOpenAIToAntigravity(body, resolved, account.projectId);
 
       let upstreamRes: Response | null = null;
       for (const upstreamUrl of UPSTREAM_URLS) {
@@ -123,12 +157,13 @@ export async function handleChatCompletions(req: NextRequest) {
           if (res.ok) {
             upstreamRes = res;
             break;
-          } else if (res.status === 429) {
-            attemptLogs.push({ account: account.name, status: 429, error: `Rate limited on ${upstreamUrl}` });
+          } else if (res.status === 429 || res.status === 503) {
+            attemptLogs.push({ account: account.name, status: res.status, error: `Rate limited on ${upstreamUrl}` });
             continue;
           } else {
             const errText = await res.text();
             attemptLogs.push({ account: account.name, status: res.status, error: errText.slice(0, 300) });
+            if (res.status === 400) break;
           }
         } catch (e: any) {
           attemptLogs.push({ account: account.name, status: 500, error: e.message || 'Connection error' });
@@ -370,19 +405,59 @@ export async function handleChatCompletions(req: NextRequest) {
   }
 
   const lastErr = attemptLogs[attemptLogs.length - 1];
+  const allRateLimits = attemptLogs.length > 0 && attemptLogs.every(l => l.status === 429 || l.status === 503);
+
+  if (!allRateLimits && lastErr && lastErr.status !== 429) {
+    return NextResponse.json(
+      {
+        error: {
+          message: `[Upstream Error]: Request for model '${modelId}' failed with HTTP ${lastErr.status}: ${lastErr.error}`,
+          type: 'upstream_error',
+          code: lastErr.status,
+          model: modelId,
+          wire_model: resolved.wireModel,
+          attempts: attemptLogs,
+        },
+      },
+      {
+        status: lastErr.status >= 400 && lastErr.status < 600 ? lastErr.status : 502,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      }
+    );
+  }
+
+  const endNow = Date.now();
+  const remainingTimes = accounts.map(a => Math.max(1, Math.ceil((a.cooldownUntil - endNow) / 1000)));
+  const minCooldownSec = Math.min(...remainingTimes);
+  const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(new Date(endNow + minCooldownSec * 1000)) + ' IST';
+
   return NextResponse.json(
     {
       error: {
-        message: lastErr ? lastErr.error : 'All configured Google accounts failed or rate limited.',
-        type: 'upstream_error',
-        code: lastErr?.status || 500,
+        message: `[Proxy Rate Limit]: All Google accounts in pool rate-limited. Earliest account ready in ${minCooldownSec}s at ${refreshTimeStr}.`,
+        type: 'upstream_rate_limit',
+        code: 429,
+        retry_after: minCooldownSec,
+        refresh_in_seconds: minCooldownSec,
+        ready_at: refreshTimeStr,
         attempts: attemptLogs,
+        accounts_status: accounts.map(a => ({
+          name: a.name,
+          cooldown_remaining_sec: Math.max(1, Math.ceil((a.cooldownUntil - endNow) / 1000))
+        }))
       },
     },
     {
-      status: lastErr?.status || 500,
+      status: 429,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Retry-After': String(minCooldownSec),
       },
     }
   );

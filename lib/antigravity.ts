@@ -36,37 +36,37 @@ export const UNRESTRICTED_SAFETY_SETTINGS = [
 ];
 
 let cachedAccounts: AccountConfig[] | null = null;
-let lastAccountPickIndex = 0;
+let nextAccountIdx = 0;
 
 export function getAccounts(): AccountConfig[] {
-  if (cachedAccounts) return cachedAccounts;
+  if (cachedAccounts && cachedAccounts.length > 0) return cachedAccounts;
 
   const accounts: AccountConfig[] = [];
-  for (let i = 1; i <= 10; i++) {
-    const refreshToken = process.env[`ACCOUNT_${i}_REFRESH_TOKEN`];
-    const projectId = process.env[`ACCOUNT_${i}_PROJECT_ID`];
-    const name = process.env[`ACCOUNT_${i}_NAME`] || `Account ${i}`;
-
-    if (refreshToken && projectId) {
-      accounts.push({
-        id: `acc_${i}`,
-        name,
-        refreshToken,
-        projectId,
-        accessToken: null,
-        expiresAt: 0,
-        cooldownUntil: 0,
-        failCount: 0
-      });
-    }
+  let i = 1;
+  while (true) {
+    const token = (process.env[`ACCOUNT_${i}_REFRESH_TOKEN`] || '').trim();
+    if (!token) break;
+    const name = (process.env[`ACCOUNT_${i}_NAME`] || `Account ${i}`).trim();
+    const projectId = (process.env[`ACCOUNT_${i}_PROJECT_ID`] || '').trim();
+    accounts.push({
+      id: `acc_${i}`,
+      name,
+      refreshToken: token,
+      projectId,
+      accessToken: null,
+      expiresAt: 0,
+      cooldownUntil: 0,
+      failCount: 0
+    });
+    i++;
   }
 
-  if (accounts.length === 0 && process.env.GOOGLE_REFRESH_TOKEN && process.env.GOOGLE_PROJECT_ID) {
+  if (accounts.length === 0 && process.env.GOOGLE_REFRESH_TOKEN) {
     accounts.push({
       id: 'acc_default',
       name: 'Default Account',
-      refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-      projectId: process.env.GOOGLE_PROJECT_ID,
+      refreshToken: process.env.GOOGLE_REFRESH_TOKEN.trim(),
+      projectId: process.env.GOOGLE_PROJECT_ID || '',
       accessToken: null,
       expiresAt: 0,
       cooldownUntil: 0,
@@ -85,11 +85,20 @@ export function pickAccount(): AccountConfig {
   }
 
   const now = Date.now();
-  const available = accounts.filter(a => a.cooldownUntil <= now);
-  const pool = available.length > 0 ? available : accounts;
+  for (let i = 0; i < accounts.length; i++) {
+    const idx = (nextAccountIdx + i) % accounts.length;
+    const acc = accounts[idx];
+    if (acc.cooldownUntil <= now) {
+      nextAccountIdx = (idx + 1) % accounts.length;
+      return acc;
+    }
+  }
 
-  lastAccountPickIndex = (lastAccountPickIndex + 1) % pool.length;
-  return pool[lastAccountPickIndex];
+  let best = accounts[0];
+  for (const acc of accounts) {
+    if (acc.cooldownUntil < best.cooldownUntil) best = acc;
+  }
+  return best;
 }
 
 export async function getAccessToken(account: AccountConfig): Promise<string> {
@@ -98,25 +107,50 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
     return account.accessToken;
   }
 
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    refresh_token: account.refreshToken,
+    grant_type: 'refresh_token',
+  });
+
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      refresh_token: account.refreshToken,
-      grant_type: 'refresh_token',
-    }),
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json',
+      'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64'
+    },
+    body: params.toString(),
   });
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`OAuth refresh token error (${res.status}): ${errText}`);
+    throw new Error(`OAuth refresh token error (${res.status}) for ${account.name}: ${errText}`);
   }
 
-  const data = await res.json();
+  const data: any = await res.json();
   account.accessToken = data.access_token;
   account.expiresAt = now + ((data.expires_in || 3600) * 1000);
+
+  if (!account.projectId) {
+    try {
+      const metaRes = await fetch('https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssistMetadata', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${account.accessToken}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64'
+        },
+        body: JSON.stringify({ metadata: { ideType: 'VSCODE', ideVersion: '1.96.0' } })
+      });
+      if (metaRes.ok) {
+        const meta: any = await metaRes.json();
+        if (meta.project) account.projectId = meta.project;
+      }
+    } catch {}
+  }
+
   return account.accessToken as string;
 }
 
@@ -221,14 +255,20 @@ export function transformOpenAIToAntigravity(
   }
 
   let thinkingBudget = resolved.defaultThinkingBudget;
-  if (typeof body.thinking_budget === 'number') {
-    thinkingBudget = body.thinking_budget;
-  } else if (body.reasoning_effort === 'none') {
-    thinkingBudget = 0;
-  } else if (body.reasoning_effort === 'low') {
-    thinkingBudget = 2048;
-  } else if (body.reasoning_effort === 'high') {
+  const modelClean = (body.model || '').toLowerCase();
+
+  if (modelClean.includes(':max') || modelClean.includes('-max') || body.reasoning_effort === 'max') {
+    thinkingBudget = 65536;
+  } else if (modelClean.includes(':high') || modelClean.includes('-high') || body.reasoning_effort === 'high') {
     thinkingBudget = 24576;
+  } else if (modelClean.includes(':low') || modelClean.includes('-low') || body.reasoning_effort === 'low') {
+    thinkingBudget = 2048;
+  } else if (modelClean.includes(':off') || modelClean.includes(':fast') || modelClean.includes('-off') || modelClean.includes('-fast') || body.reasoning_effort === 'none') {
+    thinkingBudget = 0;
+  } else if (typeof body.thinking_budget === 'number') {
+    thinkingBudget = body.thinking_budget;
+  } else if (body.thinking?.budget_tokens) {
+    thinkingBudget = body.thinking.budget_tokens;
   }
 
   const clientMaxTokens = typeof body.max_tokens === 'number' && body.max_tokens > 0
@@ -250,30 +290,41 @@ export function transformOpenAIToAntigravity(
     generationConfig.thinkingConfig = { thinkingBudget, includeThoughts: true };
   }
 
-  const envelope: any = {
-    project: projectId,
-    model: resolved.wireModel,
-    request: {
-      contents: merged,
-      generationConfig,
-      safetySettings: UNRESTRICTED_SAFETY_SETTINGS,
-    },
+  if (body.stop) {
+    const stopList = Array.isArray(body.stop) ? body.stop : [body.stop];
+    generationConfig.stopSequences = stopList.filter((s: any) => typeof s === 'string' && s.length > 0);
+  }
+
+  const reqObj: any = {
+    sessionId: `-${Date.now()}`,
+    contents: merged,
+    generationConfig,
+    safetySettings: UNRESTRICTED_SAFETY_SETTINGS,
   };
 
   if (systemBlocks.length > 0) {
-    envelope.request.systemInstruction = {
+    reqObj.systemInstruction = {
+      role: 'system',
       parts: [{ text: systemBlocks.join('\n\n') }]
     };
   }
 
   const googleTools = transformOpenAIToolsToGoogle(body.tools);
   if (googleTools) {
-    envelope.request.tools = googleTools;
+    reqObj.tools = googleTools;
     const toolConfig = formatToolChoice(body.tool_choice);
     if (toolConfig) {
-      envelope.request.toolConfig = { functionCallingConfig: toolConfig };
+      reqObj.toolConfig = { functionCallingConfig: toolConfig };
     }
   }
 
-  return envelope;
+  return {
+    project: projectId,
+    requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
+    userAgent: 'antigravity',
+    requestType: 'agent',
+    model: resolved.wireModel,
+    request: reqObj
+  };
 }
+

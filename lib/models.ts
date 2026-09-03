@@ -10,7 +10,69 @@ export interface ModelSpec {
 }
 
 export const SUPPORTED_MODELS: ModelSpec[] = [
-  // 1. Gemini 3.7 Flash Series
+  // 1. Gemini 3.8 Flash Series (Next-Gen Flagship)
+  {
+    id: "gemini-3.8-flash-high",
+    name: "Gemini 3.8 Flash (High)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 24576,
+    description: "Google's next-gen flagship hybrid reasoning model with high thinking budget.",
+    tier: "High",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-medium",
+    name: "Gemini 3.8 Flash (Medium)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Balanced multimodal and coding reasoning on Gemini 3.8.",
+    tier: "Medium",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-low",
+    name: "Gemini 3.8 Flash (Low)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 2048,
+    description: "Snappy conversational reasoning tier on Gemini 3.8.",
+    tier: "Low",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-fast",
+    name: "Gemini 3.8 Flash (Fast)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 0,
+    description: "Zero-thinking ultra-low latency generation for fast coding tool loops.",
+    tier: "Fast",
+    speed: "Ultra-Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Standard Gemini 3.8 Flash flagship model.",
+    tier: "Standard",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-max",
+    name: "Gemini 3.8 Flash (Max)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 65536,
+    description: "Maximum reasoning budget (64K tokens) for deep architectural planning.",
+    tier: "Max",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+
+  // 2. Gemini 3.7 Flash Series
   {
     id: "gemini-3.7-flash-high",
     name: "Gemini 3.7 Flash (High)",
@@ -169,6 +231,23 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {
     return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+  }
+
+  // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
+  if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
+  }
+  if (clean === 'gemini-3.8-flash-high' || clean === 'gemini-3.8-flash:high') {
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
+  }
+  if (clean === 'gemini-3.8-flash-medium' || clean === 'gemini-3.8-flash-mid' || clean === 'gemini-3.8-flash:medium' || clean === 'gemini-3.8-flash:mid' || clean === 'gemini-3.8-flash' || clean === 'gemini-3.8-flash-tiered') {
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 };
+  }
+  if (clean === 'gemini-3.8-flash-low' || clean === 'gemini-3.8-flash:low') {
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
+  }
+  if (clean === 'gemini-3.8-flash-fast' || clean === 'gemini-3.8-flash:fast' || clean === 'gemini-3.8-flash-off' || clean === 'gemini-3.8-flash:off') {
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 0 };
   }
 
   // Gemini 3.7 Flash variants (high, max, medium/mid, low, fast/off)

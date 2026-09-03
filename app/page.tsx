@@ -23,7 +23,7 @@ export default function AntigravityOpenAIControlCenter() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   // Playground / Test Console State
-  const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash-high');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
   const [testPrompt, setTestPrompt] = useState('Write a concise, robust type-safe LRU Cache in TypeScript with O(1) get and set operations.');
   const [testOutput, setTestOutput] = useState('');
   const [testThoughts, setTestThoughts] = useState('');
@@ -301,6 +301,16 @@ for await (const chunk of stream) {
 
   const NATIVE_ANTIGRAVITY_MODELS = [
     {
+      group: 'Google Gemini 3.8 Flash (Next-Gen)',
+      items: [
+        { id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash', tier: 'High', speed: 'Fast', tokens: '24,576 Thinking', desc: 'Google next-gen flagship hybrid reasoning model with deep thinking budget.' },
+        { id: 'gemini-3.8-flash-medium', name: 'Gemini 3.8 Flash', tier: 'Medium (Mid)', speed: 'Fast', tokens: '8,192 Thinking', desc: 'Balanced coding & multimodal reasoning on Gemini 3.8.' },
+        { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash', tier: 'Low', speed: 'Fast', tokens: '2,048 Thinking', desc: 'Lightweight thinking for responsive coding and quick iterations.' },
+        { id: 'gemini-3.8-flash-fast', name: 'Gemini 3.8 Flash', tier: 'Fast (Off)', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'Instantaneous zero-thinking generation for fast coding tool loops.' },
+        { id: 'gemini-3.8-flash-max', name: 'Gemini 3.8 Flash', tier: 'Max', speed: 'Deep', tokens: '65,536 Thinking', desc: 'Maximum reasoning budget (64K tokens) for complex architecture planning.' },
+      ]
+    },
+    {
       group: 'Google Gemini 3.7 Flash',
       items: [
         { id: 'gemini-3.7-flash-high', name: 'Gemini 3.7 Flash', tier: 'High', speed: 'Fast', tokens: '24,576 Thinking', desc: 'Flagship reasoning model with high thinking headroom.' },
@@ -525,6 +535,13 @@ for await (const chunk of stream) {
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
               >
+                <optgroup label="Gemini 3.8 Flash (Next-Gen)">
+                  <option value="gemini-3.8-flash-high">gemini-3.8-flash-high (24k Thinking)</option>
+                  <option value="gemini-3.8-flash-medium">gemini-3.8-flash-medium (8k Thinking)</option>
+                  <option value="gemini-3.8-flash-low">gemini-3.8-flash-low (2k Thinking)</option>
+                  <option value="gemini-3.8-flash-fast">gemini-3.8-flash-fast (0 Thinking)</option>
+                  <option value="gemini-3.8-flash-max">gemini-3.8-flash-max (64k Thinking)</option>
+                </optgroup>
                 <optgroup label="Gemini 3.7 Flash">
                   <option value="gemini-3.7-flash-high">gemini-3.7-flash-high (24k Thinking)</option>
                   <option value="gemini-3.7-flash-medium">gemini-3.7-flash-medium (8k Thinking)</option>

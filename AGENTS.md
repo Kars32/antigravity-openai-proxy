@@ -27,6 +27,11 @@ All models are exposed with explicit standalone IDs for high, medium, low, and f
 
 | Model ID | Name | Tier | Speed | Thinking Budget | Context Window | Internal Wire Model |
 |---|---|---|---|---|---|---|
+| `gemini-3.8-flash-high` | Gemini 3.8 Flash | **High** | Fast | 24,576 Tokens | 1,048,576 | `gemini-3.8-flash-tiered` |
+| `gemini-3.8-flash-medium` | Gemini 3.8 Flash | **Medium (Mid)** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.8-flash-tiered` |
+| `gemini-3.8-flash-low` | Gemini 3.8 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.8-flash-tiered` |
+| `gemini-3.8-flash-fast` | Gemini 3.8 Flash | **Fast (Off)** | Ultra-Fast | 0 Tokens | 1,048,576 | `gemini-3.8-flash-tiered` |
+| `gemini-3.8-flash-max` | Gemini 3.8 Flash | **Max** | Deep | 65,536 Tokens | 1,048,576 | `gemini-3.8-flash-tiered` |
 | `gemini-3.7-flash-high` | Gemini 3.7 Flash | **High** | Fast | 24,576 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
 | `gemini-3.7-flash-medium` | Gemini 3.7 Flash | **Medium (Mid)** | Fast | 8,192 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |
 | `gemini-3.7-flash-low` | Gemini 3.7 Flash | **Low** | Fast | 2,048 Tokens | 1,048,576 | `gemini-3.7-flash-tiered` |

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccounts } from '@/lib/antigravity';
 import { SUPPORTED_MODELS } from '@/lib/models';
+import { getOpenCodeAccounts } from '@/lib/opencode';
 import { checkAuth, handleOptions } from '@/lib/completions';
 
 export const runtime = 'nodejs';
@@ -19,13 +20,14 @@ export async function GET(req: NextRequest) {
   }
 
   const accounts = getAccounts();
+  const openCodeAccounts = getOpenCodeAccounts();
   const now = Date.now();
 
   return NextResponse.json(
     {
       status: 'online',
       gateway: 'antigravity-openai-proxy',
-      version: '1.0.0',
+      version: '1.1.0',
       accounts: accounts.map(a => ({
         id: a.id,
         name: a.name,
@@ -34,6 +36,15 @@ export async function GET(req: NextRequest) {
         cooldownRemainingSec: Math.max(0, Math.ceil((a.cooldownUntil - now) / 1000)),
         failCount: a.failCount,
       })),
+      opencodeAccounts: openCodeAccounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        isCoolingDown: a.cooldownUntil > now,
+        cooldownRemainingSec: Math.max(0, Math.ceil((a.cooldownUntil - now) / 1000)),
+        failCount: a.failCount,
+        successCount: a.successCount,
+      })),
+      totalOpenCodeAccounts: openCodeAccounts.length,
       modelsCount: SUPPORTED_MODELS.length,
       timestamp: new Date().toISOString(),
     },

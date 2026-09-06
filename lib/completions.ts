@@ -7,6 +7,7 @@ import {
   transformOpenAIToAntigravity,
 } from './antigravity';
 import { resolveModel } from './models';
+import { resolveOpenCodeModel, executeOpenCodeCompletion } from './opencode';
 
 const UPSTREAM_URLS = [
   'https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse',
@@ -51,14 +52,15 @@ export async function handleChatCompletions(req: NextRequest) {
     );
   }
 
-  const modelId = body.model || 'gemini-3.7-flash';
-  const resolved = resolveModel(modelId);
+  const modelId = (body.model || 'gemini-3.7-flash').trim();
+  const openCodeResolved = resolveOpenCodeModel(modelId);
+  const resolved = openCodeResolved ? null : resolveModel(modelId);
 
-  if (!resolved) {
+  if (!openCodeResolved && !resolved) {
     return NextResponse.json(
       {
         error: {
-          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.7-flash, gemini-3.7-flash-high, gemini-3.7-flash-medium, gemini-3.7-flash-low, gemini-3.7-flash-fast, gemini-3.7-flash-max, gemini-3.1-pro, gemini-3.5-flash, gemini-2.5-flash, claude-sonnet-4-6, claude-opus-4-6-thinking, gpt-4o.`,
+          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.8-flash, gemini-3.7-flash, gemini-3.1-pro, big-pickle, big-pickle-fast, mimo-v2.5-free, mimo-v2.5-free-fast, ling-3.0-flash-fin-free, ling-3.0-flash-fin-free-fast, nemotron-3-ultra-free, nemotron-3-ultra-free-fast, nemotron-3.5-lightning-free, nemotron-3.5-lightning-free-fast.`,
           type: 'invalid_request_error',
           param: 'model',
           code: 'model_not_found',
@@ -66,6 +68,15 @@ export async function handleChatCompletions(req: NextRequest) {
       },
       { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } }
     );
+  }
+
+  // OpenCode execution route
+  if (openCodeResolved) {
+    return executeOpenCodeCompletion({
+      body,
+      modelId,
+      resolvedModel: openCodeResolved,
+    });
   }
 
   const stream = body.stream === true;

@@ -39,6 +39,16 @@ All models are exposed with explicit standalone IDs for high, medium, low, and f
 | `claude-sonnet-4-6` | Claude Sonnet 4.6 | **Thinking** | Adaptive | 16,384 Tokens | 1,048,576 | `claude-sonnet-4-6` |
 | `claude-opus-4-6-thinking`| Claude Opus 4.6 | **Thinking** | Deep | 16,384 Tokens | 1,048,576 | `claude-opus-4-6-thinking` |
 | `gpt-oss-120b-medium` | GPT-OSS 120B | **Medium** | Fast | 8,192 Tokens | 1,048,576 | `gpt-oss-120b-medium` |
+| `big-pickle` | Big Pickle | **DeepSeek** | Deep | Enabled | 131,072 | `big-pickle` (OpenCode) |
+| `big-pickle-fast` | Big Pickle (Fast) | **Fast** | Ultra-Fast | 0 Tokens | 131,072 | `big-pickle` (OpenCode) |
+| `mimo-v2.5-free` | Xiaomi MiMo v2.5 | **Xiaomi** | Fast | Enabled | 131,072 | `mimo-v2.5-free` (OpenCode) |
+| `mimo-v2.5-free-fast` | Xiaomi MiMo v2.5 (Fast) | **Fast** | Ultra-Fast | 0 Tokens | 131,072 | `mimo-v2.5-free` (OpenCode) |
+| `ling-3.0-flash-fin-free` | Ling 3.0 Flash | **Ling** | Fast | Enabled | 131,072 | `ling-3.0-flash-fin-free` (OpenCode) |
+| `ling-3.0-flash-fin-free-fast` | Ling 3.0 Flash (Fast) | **Fast** | Ultra-Fast | 0 Tokens | 131,072 | `ling-3.0-flash-fin-free` (OpenCode) |
+| `nemotron-3-ultra-free` | NVIDIA Nemotron 3 Ultra | **Ultra / 1M** | Deep | Enabled | 1,048,576 | `nemotron-3-ultra-free` (OpenCode) |
+| `nemotron-3-ultra-free-fast` | NVIDIA Nemotron 3 Ultra (Fast) | **Fast / 1M** | Ultra-Fast | 0 Tokens | 1,048,576 | `nemotron-3-ultra-free` (OpenCode) |
+| `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | **Lightning / 1M** | Fast | Enabled | 1,048,576 | `nemotron-3.5-lightning-free` (OpenCode) |
+| `nemotron-3.5-lightning-free-fast` | NVIDIA Nemotron 3.5 Lightning (Fast) | **Fast / 1M** | Ultra-Fast | 0 Tokens | 1,048,576 | `nemotron-3.5-lightning-free` (OpenCode) |
 
 ---
 

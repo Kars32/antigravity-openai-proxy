@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     id: m.id,
     object: 'model',
     created: 1700000000,
-    owned_by: 'google-antigravity',
+    owned_by: m.id.includes('pickle') || m.id.includes('mimo') || m.id.includes('ling') || m.id.includes('nemotron') ? 'opencode' : 'google-antigravity',
     permission: [],
     root: m.wireModel,
     parent: null,

@@ -1,3 +1,5 @@
+import { OPENCODE_MODELS } from './opencode';
+
 export interface ModelSpec {
   id: string;
   name: string;
@@ -220,7 +222,17 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     tier: "Alias",
     speed: "Fast",
     contextWindow: 1048576,
-  }
+  },
+  ...OPENCODE_MODELS.map(m => ({
+    id: m.id,
+    name: m.name,
+    wireModel: m.wireModel,
+    defaultThinkingBudget: m.defaultThinkingBudget,
+    description: m.description,
+    tier: m.tier,
+    speed: m.speed,
+    contextWindow: m.contextWindow,
+  }))
 ];
 
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {

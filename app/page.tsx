@@ -346,6 +346,21 @@ for await (const chunk of stream) {
       items: [
         { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)', tier: 'Medium', speed: 'Fast', tokens: '8,192 Thinking', desc: 'Open-weights 120B reasoning model hosted on Google CloudCode.' },
       ]
+    },
+    {
+      group: 'OpenCode Free Models Suite (with No-Think)',
+      items: [
+        { id: 'big-pickle', name: 'Big Pickle (DeepSeek Thinking)', tier: 'Reasoning', speed: 'Deep', tokens: 'Thinking Enabled', desc: 'DeepSeek reasoning model on OpenCode with deep chain-of-thought analysis.' },
+        { id: 'big-pickle-fast', name: 'Big Pickle (No-Think / Fast)', tier: 'Fast', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'Big Pickle with reasoning disabled for ultra-fast generation.' },
+        { id: 'mimo-v2.5-free', name: 'Xiaomi MiMo v2.5 Free', tier: 'Reasoning', speed: 'Fast', tokens: 'Thinking Enabled', desc: 'Xiaomi MiMo v2.5 multimodal reasoning model on OpenCode.' },
+        { id: 'mimo-v2.5-free-fast', name: 'Xiaomi MiMo v2.5 Free (Fast)', tier: 'Fast', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'Xiaomi MiMo v2.5 with reasoning disabled for rapid coding.' },
+        { id: 'ling-3.0-flash-fin-free', name: 'Ling 3.0 Flash Free', tier: 'Reasoning', speed: 'Fast', tokens: 'Thinking Enabled', desc: 'Ling 3.0 Flash financial and general intelligence reasoning model.' },
+        { id: 'ling-3.0-flash-fin-free-fast', name: 'Ling 3.0 Flash Free (Fast)', tier: 'Fast', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'Ling 3.0 Flash with reasoning disabled for fast response.' },
+        { id: 'nemotron-3-ultra-free', name: 'NVIDIA Nemotron 3 Ultra Free', tier: 'Ultra / 1M', speed: 'Deep', tokens: 'Thinking Enabled', desc: 'NVIDIA Nemotron 3 Ultra with massive 1M context on OpenCode.' },
+        { id: 'nemotron-3-ultra-free-fast', name: 'NVIDIA Nemotron 3 Ultra Free (Fast)', tier: 'Fast / 1M', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'NVIDIA Nemotron 3 Ultra with 1M context and reasoning disabled.' },
+        { id: 'nemotron-3.5-lightning-free', name: 'NVIDIA Nemotron 3.5 Lightning Free', tier: 'Lightning / 1M', speed: 'Fast', tokens: 'Thinking Enabled', desc: 'NVIDIA Nemotron 3.5 Lightning with 1M context on OpenCode.' },
+        { id: 'nemotron-3.5-lightning-free-fast', name: 'NVIDIA Nemotron 3.5 Lightning Free (Fast)', tier: 'Fast / 1M', speed: 'Ultra-Fast', tokens: '0 Thinking', desc: 'NVIDIA Nemotron 3.5 Lightning with reasoning disabled.' },
+      ]
     }
   ];
 

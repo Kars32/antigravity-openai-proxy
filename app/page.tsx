@@ -20,6 +20,7 @@ export default function AntigravityOpenAIControlCenter() {
   // Gateway Status & Telemetry
   const [status, setStatus] = useState<any>(null);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [opencodeAccounts, setOpencodeAccounts] = useState<any[]>([]);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   // Playground / Test Console State
@@ -66,6 +67,24 @@ export default function AntigravityOpenAIControlCenter() {
         });
         return changed ? next : prev;
       });
+
+      setOpencodeAccounts(prev => {
+        if (!prev || prev.length === 0) return prev;
+        let changed = false;
+        const next = prev.map(acc => {
+          if (acc.cooldownRemainingSec && acc.cooldownRemainingSec > 0) {
+            changed = true;
+            const remaining = acc.cooldownRemainingSec - 1;
+            return {
+              ...acc,
+              cooldownRemainingSec: Math.max(0, remaining),
+              isCoolingDown: remaining > 0,
+            };
+          }
+          return acc;
+        });
+        return changed ? next : prev;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -89,6 +108,7 @@ export default function AntigravityOpenAIControlCenter() {
         setIsAuthenticated(true);
         setStatus(data);
         setAccounts(data.accounts || []);
+        setOpencodeAccounts(data.opencodeAccounts || []);
         setLatencyMs(Date.now() - start);
 
         if (clearUrlParam && window.history.replaceState) {
@@ -579,6 +599,18 @@ for await (const chunk of stream) {
                 <optgroup label="Google Open-Weights">
                   <option value="gpt-oss-120b-medium">gpt-oss-120b-medium (8k Thinking)</option>
                 </optgroup>
+                <optgroup label="OpenCode Free Models (with Fast/No-Think)">
+                  <option value="big-pickle">big-pickle (DeepSeek Thinking)</option>
+                  <option value="big-pickle-fast">big-pickle-fast (No-Think)</option>
+                  <option value="mimo-v2.5-free">mimo-v2.5-free (Xiaomi MiMo Thinking)</option>
+                  <option value="mimo-v2.5-free-fast">mimo-v2.5-free-fast (No-Think)</option>
+                  <option value="ling-3.0-flash-fin-free">ling-3.0-flash-fin-free (Ling Thinking)</option>
+                  <option value="ling-3.0-flash-fin-free-fast">ling-3.0-flash-fin-free-fast (No-Think)</option>
+                  <option value="nemotron-3-ultra-free">nemotron-3-ultra-free (1M Thinking)</option>
+                  <option value="nemotron-3-ultra-free-fast">nemotron-3-ultra-free-fast (1M No-Think)</option>
+                  <option value="nemotron-3.5-lightning-free">nemotron-3.5-lightning-free (1M Lightning)</option>
+                  <option value="nemotron-3.5-lightning-free-fast">nemotron-3.5-lightning-free-fast (1M No-Think)</option>
+                </optgroup>
               </select>
             </div>
 
@@ -657,6 +689,32 @@ for await (const chunk of stream) {
               </div>
             ))}
           </div>
+
+          {opencodeAccounts.length > 0 && (
+            <div style={{ marginTop: 28 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 6px 0', color: '#f4f4f5' }}>
+                OpenCode Rotating Guest Pool ({opencodeAccounts.length} Sessions)
+              </h3>
+              <p style={{ fontSize: 12, color: '#a1a1aa', margin: '0 0 16px 0' }}>
+                Automated round-robin rotation across 16 client sessions with instantaneous 429 failover for OpenCode models.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                {opencodeAccounts.map(acc => (
+                  <div key={acc.id} style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{acc.name}</span>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, backgroundColor: acc.isCoolingDown ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: acc.isCoolingDown ? '#ef4444' : '#22c55e', fontWeight: 600 }}>
+                        {acc.isCoolingDown ? `${acc.cooldownRemainingSec}s` : '● Ready'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#71717a' }}>
+                      Success: <span style={{ color: '#a1a1aa' }}>{acc.successCount || 0}</span> | 429s: <span style={{ color: '#a1a1aa' }}>{acc.failCount || 0}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

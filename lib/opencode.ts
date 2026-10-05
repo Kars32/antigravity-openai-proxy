@@ -194,12 +194,29 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Bounded in-memory resolution cache for O(1) OpenCode model lookup.
+// Avoids repeated regex matching, string manipulation, and prefix stripping on high-volume traffic.
+const openCodeResolutionCache = new Map<string, ResolvedOpenCodeModel | null>();
+const MAX_OPENCODE_CACHE_SIZE = 500;
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
-  let clean = modelId.trim().toLowerCase();
+  const rawKey = modelId.trim().toLowerCase();
 
+  if (openCodeResolutionCache.has(rawKey)) {
+    return openCodeResolutionCache.get(rawKey)!;
+  }
+
+  const result = uncachedResolveOpenCodeModel(rawKey);
+  if (openCodeResolutionCache.size < MAX_OPENCODE_CACHE_SIZE) {
+    openCodeResolutionCache.set(rawKey, result);
+  }
+  return result;
+}
+
+function uncachedResolveOpenCodeModel(rawKey: string): ResolvedOpenCodeModel | null {
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
-  clean = clean.replace(/^(models\/|opencode\/)/, '');
+  let clean = rawKey.replace(/^(models\/|opencode\/)/, '');
 
   // Exclude non-working or delisted models explicitly
   if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {

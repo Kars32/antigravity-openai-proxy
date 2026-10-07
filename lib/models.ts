@@ -235,8 +235,36 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Pre-computed static model list response using O(1) Set lookup to eliminate O(N*M) nested array scans per request
+const opencodeModelIds = new Set(OPENCODE_MODELS.map(m => m.id));
+
+export const PRECOMPUTED_MODELS_LIST = SUPPORTED_MODELS.map(m => ({
+  id: m.id,
+  object: 'model',
+  created: 1700000000,
+  owned_by: opencodeModelIds.has(m.id) ? 'opencode' : 'google-antigravity',
+  permission: [],
+  root: m.wireModel,
+  parent: null,
+}));
+
+// O(1) resolution memoization cache to avoid repeated array searches and string evaluations
+const MAX_CACHE_SIZE = 256;
+const modelResolutionCache = new Map<string, { wireModel: string; defaultThinkingBudget: number } | null>();
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
+  const cached = modelResolutionCache.get(modelId);
+  if (cached !== undefined) return cached;
+
+  const result = uncachedResolveModel(modelId);
+  if (modelResolutionCache.size < MAX_CACHE_SIZE) {
+    modelResolutionCache.set(modelId, result);
+  }
+  return result;
+}
+
+function uncachedResolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   const clean = modelId.trim().toLowerCase();
 
   // Exact ID match

@@ -194,8 +194,24 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// O(1) resolution memoization cache to avoid repeated string manipulation and regex evaluation
+const MAX_CACHE_SIZE = 256;
+const openCodeModelCache = new Map<string, ResolvedOpenCodeModel | null>();
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
+
+  const cached = openCodeModelCache.get(modelId);
+  if (cached !== undefined) return cached;
+
+  const result = uncachedResolveOpenCodeModel(modelId);
+  if (openCodeModelCache.size < MAX_CACHE_SIZE) {
+    openCodeModelCache.set(modelId, result);
+  }
+  return result;
+}
+
+function uncachedResolveOpenCodeModel(modelId: string): ResolvedOpenCodeModel | null {
   let clean = modelId.trim().toLowerCase();
 
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)

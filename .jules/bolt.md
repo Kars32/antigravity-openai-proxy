@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-04 - Static Catalog Pre-computation & O(1) Model Indexing
+**Learning:** In high-throughput gateway proxies, dynamically building static model lists (`/v1/models`) using `.map()` with nested `.some()` checks creates $O(M \times N)$ quadratic overhead and millions of temporary allocations per 100k requests. Similarly, linear array `.find()` scanning and cascading conditional branches in model resolution routines slow down hot request paths.
+**Action:** Pre-compute static catalog response arrays and index model specs/aliases in $O(1)$ module-scoped `Map` and `Set` data structures at load time.

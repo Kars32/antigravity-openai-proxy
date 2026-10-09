@@ -235,92 +235,69 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Pre-built Map lookup table for O(1) model spec resolution.
+// Eliminates array searches and sequential string comparison branches per completion request.
+const SUPPORTED_MODEL_MAP = new Map<string, { wireModel: string; defaultThinkingBudget: number }>();
+
+for (const m of SUPPORTED_MODELS) {
+  SUPPORTED_MODEL_MAP.set(m.id, {
+    wireModel: m.wireModel,
+    defaultThinkingBudget: m.defaultThinkingBudget,
+  });
+}
+
+const registerModelAliases = (
+  aliases: string[],
+  wireModel: string,
+  defaultThinkingBudget: number
+) => {
+  for (const alias of aliases) {
+    SUPPORTED_MODEL_MAP.set(alias, { wireModel, defaultThinkingBudget });
+  }
+};
+
+// Gemini 3.8 Flash variants
+registerModelAliases(['gemini-3.8-flash-max', 'gemini-3.8-flash:max', 'gemini-3.8-flash-xhigh'], 'gemini-3.8-flash-tiered', 65536);
+registerModelAliases(['gemini-3.8-flash-high', 'gemini-3.8-flash:high'], 'gemini-3.8-flash-tiered', 24576);
+registerModelAliases(['gemini-3.8-flash-medium', 'gemini-3.8-flash-mid', 'gemini-3.8-flash:medium', 'gemini-3.8-flash:mid', 'gemini-3.8-flash', 'gemini-3.8-flash-tiered'], 'gemini-3.8-flash-tiered', 8192);
+registerModelAliases(['gemini-3.8-flash-low', 'gemini-3.8-flash:low'], 'gemini-3.8-flash-tiered', 2048);
+registerModelAliases(['gemini-3.8-flash-fast', 'gemini-3.8-flash:fast', 'gemini-3.8-flash-off', 'gemini-3.8-flash:off'], 'gemini-3.8-flash-tiered', 0);
+
+// Gemini 3.7 Flash variants
+registerModelAliases(['gemini-3.7-flash-max', 'gemini-3.7-flash:max', 'gemini-3.7-flash-xhigh'], 'gemini-3.7-flash-tiered', 65536);
+registerModelAliases(['gemini-3.7-flash-high', 'gemini-3.7-flash:high'], 'gemini-3.7-flash-tiered', 24576);
+registerModelAliases(['gemini-3.7-flash-medium', 'gemini-3.7-flash-mid', 'gemini-3.7-flash:medium', 'gemini-3.7-flash:mid', 'gemini-3.7-flash'], 'gemini-3.7-flash-tiered', 8192);
+registerModelAliases(['gemini-3.7-flash-low', 'gemini-3.7-flash:low'], 'gemini-3.7-flash-tiered', 2048);
+registerModelAliases(['gemini-3.7-flash-fast', 'gemini-3.7-flash:fast', 'gemini-3.7-flash-off', 'gemini-3.7-flash:off'], 'gemini-3.7-flash-tiered', 0);
+
+// Gemini 3.6 Flash variants
+registerModelAliases(['gemini-3.6-flash-high', 'gemini-3.6-flash:high'], 'gemini-3.7-flash-tiered', 16384);
+registerModelAliases(['gemini-3.6-flash-medium', 'gemini-3.6-flash-mid', 'gemini-3.6-flash:medium', 'gemini-3.6-flash:mid', 'gemini-3.6-flash'], 'gemini-3.7-flash-tiered', 8192);
+registerModelAliases(['gemini-3.6-flash-low', 'gemini-3.6-flash:low'], 'gemini-3.7-flash-tiered', 2048);
+
+// Gemini 3.1 Pro variants
+registerModelAliases(['gemini-3.1-pro-low', 'gemini-3.1-pro:low'], 'gemini-pro-agent', 4096);
+registerModelAliases(['gemini-3.1-pro', 'gemini-pro-agent', 'gemini-pro'], 'gemini-pro-agent', 32768);
+
+// Fast Flash Agent Series
+registerModelAliases(['gemini-3.5-flash', 'gemini-3-flash-agent'], 'gemini-3-flash-agent', 0);
+registerModelAliases(['gemini-2.5-flash'], 'gemini-2.5-flash', 0);
+
+// Anthropic Claude Series
+registerModelAliases(['claude-sonnet-4-6', 'claude-sonnet-4.6', 'claude-3-7-sonnet', 'claude-3-5-sonnet', 'claude-sonnet'], 'claude-sonnet-4-6', 16384);
+registerModelAliases(['claude-opus-4-6-thinking', 'claude-opus-4-6', 'claude-opus'], 'claude-opus-4-6-thinking', 16384);
+
+// OpenAI Aliases
+registerModelAliases(['gpt-4o', 'gpt-4', 'gpt-3.5-turbo'], 'gemini-3.7-flash-tiered', 8192);
+registerModelAliases(['gpt-4o-mini'], 'gemini-3.7-flash-tiered', 2048);
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
-  if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
-  }
-
-  // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.8-flash-high' || clean === 'gemini-3.8-flash:high') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.8-flash-medium' || clean === 'gemini-3.8-flash-mid' || clean === 'gemini-3.8-flash:medium' || clean === 'gemini-3.8-flash:mid' || clean === 'gemini-3.8-flash' || clean === 'gemini-3.8-flash-tiered') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.8-flash-low' || clean === 'gemini-3.8-flash:low') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.8-flash-fast' || clean === 'gemini-3.8-flash:fast' || clean === 'gemini-3.8-flash-off' || clean === 'gemini-3.8-flash:off') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.7 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.7-flash-max' || clean === 'gemini-3.7-flash:max' || clean === 'gemini-3.7-flash-xhigh') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.7-flash-medium' || clean === 'gemini-3.7-flash-mid' || clean === 'gemini-3.7-flash:medium' || clean === 'gemini-3.7-flash:mid' || clean === 'gemini-3.7-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.7-flash-low' || clean === 'gemini-3.7-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.7-flash-fast' || clean === 'gemini-3.7-flash:fast' || clean === 'gemini-3.7-flash-off' || clean === 'gemini-3.7-flash:off') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.6 Flash variants (mapped to flash-tiered with appropriate thinking budgets)
-  if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'gemini-3.6-flash-medium' || clean === 'gemini-3.6-flash-mid' || clean === 'gemini-3.6-flash:medium' || clean === 'gemini-3.6-flash:mid' || clean === 'gemini-3.6-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.6-flash-low' || clean === 'gemini-3.6-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-
-  // Gemini 3.1 Pro variants
-  if (clean === 'gemini-3.1-pro-low' || clean === 'gemini-3.1-pro:low') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 4096 };
-  }
-  if (clean === 'gemini-3.1-pro' || clean === 'gemini-pro-agent' || clean === 'gemini-pro') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 32768 };
-  }
-
-  // Fast flash models
-  if (clean === 'gemini-3.5-flash' || clean === 'gemini-3-flash-agent') {
-    return { wireModel: 'gemini-3-flash-agent', defaultThinkingBudget: 0 };
-  }
-  if (clean === 'gemini-2.5-flash') {
-    return { wireModel: 'gemini-2.5-flash', defaultThinkingBudget: 0 };
-  }
-
-  // Claude models
-  if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6' || clean === 'claude-3-7-sonnet' || clean === 'claude-3-5-sonnet' || clean === 'claude-sonnet') {
-    return { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus') {
-    return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 };
-  }
-
-  // OpenAI aliases
-  if (clean === 'gpt-4o' || clean === 'gpt-4' || clean === 'gpt-3.5-turbo') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gpt-4o-mini') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
+  // O(1) Map lookup for supported model ID or alias
+  const hit = SUPPORTED_MODEL_MAP.get(clean);
+  if (hit) return hit;
 
   // Google internal wire format pass-through
   if (clean.startsWith('publishers/google/models/') || clean.startsWith('models/')) {

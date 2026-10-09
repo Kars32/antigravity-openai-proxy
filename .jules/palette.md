@@ -1,0 +1,3 @@
+## 2025-05-18 - Control Center Accessibility & Tab Semantics
+**Learning:** Single Page Application dashboards built with raw `<button>` elements as tabs and implicit `<label>` text often lack proper WAI-ARIA tab attributes (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`, `role="tabpanel"`) and explicitly linked `htmlFor`/`id` form controls, preventing screen readers from announcing control state and form inputs.
+**Action:** Always link form labels to control `id`s and implement full WAI-ARIA tab semantics and live regions (`aria-live="polite"`, `role="alert"`) for streaming/dynamic SPA controls.

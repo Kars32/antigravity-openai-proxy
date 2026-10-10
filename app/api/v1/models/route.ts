@@ -10,6 +10,20 @@ export async function OPTIONS() {
   return handleOptions();
 }
 
+// Pre-compute the static model catalog response data at module load time.
+// Eliminates per-request O(N * M) nested array searches and array object re-allocations.
+const OPENCODE_MODEL_IDS = new Set(OPENCODE_MODELS.map(om => om.id));
+
+const MODEL_LIST_DATA = SUPPORTED_MODELS.map(m => ({
+  id: m.id,
+  object: 'model',
+  created: 1700000000,
+  owned_by: OPENCODE_MODEL_IDS.has(m.id) ? 'opencode' : 'google-antigravity',
+  permission: [],
+  root: m.wireModel,
+  parent: null,
+}));
+
 export async function GET(req: NextRequest) {
   if (!checkAuth(req)) {
     return NextResponse.json(
@@ -18,18 +32,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const data = SUPPORTED_MODELS.map(m => ({
-    id: m.id,
-    object: 'model',
-    created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
-    permission: [],
-    root: m.wireModel,
-    parent: null,
-  }));
-
   return NextResponse.json(
-    { object: 'list', data },
+    { object: 'list', data: MODEL_LIST_DATA },
     { headers: { 'Access-Control-Allow-Origin': '*' } }
   );
 }

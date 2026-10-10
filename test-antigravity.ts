@@ -228,7 +228,37 @@ async function runAsyncTests() {
     global.fetch = originalFetch;
   }
 
-  console.log('\nAll 10 test suites passed successfully!');
+  // Test 11: Fast O(1) Model Resolution & Alias Mapping Verification
+  const { resolveModel } = await import('./lib/models');
+  const { resolveOpenCodeModel } = await import('./lib/opencode');
+
+  const m1 = resolveModel('gemini-3.8-flash');
+  assert.strictEqual(m1?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(m1?.defaultThinkingBudget, 8192);
+
+  const m2 = resolveModel('gpt-4o');
+  assert.strictEqual(m2?.wireModel, 'gemini-3.7-flash-tiered');
+  assert.strictEqual(m2?.defaultThinkingBudget, 8192);
+
+  const m3 = resolveModel('claude-sonnet-4-6');
+  assert.strictEqual(m3?.wireModel, 'claude-sonnet-4-6');
+  assert.strictEqual(m3?.defaultThinkingBudget, 16384);
+
+  const oc1 = resolveOpenCodeModel('big-pickle');
+  assert.strictEqual(oc1?.wireModel, 'big-pickle');
+  assert.strictEqual(oc1?.isFast, false);
+
+  const oc2 = resolveOpenCodeModel('big-pickle-fast');
+  assert.strictEqual(oc2?.wireModel, 'big-pickle');
+  assert.strictEqual(oc2?.isFast, true);
+
+  const oc3 = resolveOpenCodeModel('opencode/mimo-v2.5-free-fast');
+  assert.strictEqual(oc3?.wireModel, 'mimo-v2.5-free');
+  assert.strictEqual(oc3?.isFast, true);
+
+  console.log('✓ Test 11: O(1) Model Resolution & Alias Mapping passed');
+
+  console.log('\nAll 11 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

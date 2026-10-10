@@ -14,6 +14,14 @@ const UPSTREAM_URLS = [
   'https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse',
 ];
 
+const IST_DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
+});
+
 export function checkAuth(req: NextRequest): boolean {
   const proxyKey = process.env.PROXY_API_KEY;
   if (!proxyKey) return true;
@@ -95,13 +103,7 @@ export async function handleChatCompletions(req: NextRequest) {
   if (availableAccounts.length === 0 && accounts.length > 0) {
     const remainingTimes = accounts.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000)));
     const minWaitSec = Math.min(...remainingTimes);
-    const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    }).format(new Date(now + minWaitSec * 1000)) + ' IST';
+    const refreshTimeStr = IST_DATE_FORMATTER.format(new Date(now + minWaitSec * 1000)) + ' IST';
 
     const accountBreakdown = accounts.map(a => `${a.name}: Cooldown (${Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))}s)`).join(' | ');
 
@@ -450,13 +452,7 @@ export async function handleChatCompletions(req: NextRequest) {
   const endNow = Date.now();
   const remainingTimes = accounts.map(a => Math.max(1, Math.ceil((a.cooldownUntil - endNow) / 1000)));
   const minCooldownSec = Math.min(...remainingTimes);
-  const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  }).format(new Date(endNow + minCooldownSec * 1000)) + ' IST';
+  const refreshTimeStr = IST_DATE_FORMATTER.format(new Date(endNow + minCooldownSec * 1000)) + ' IST';
 
   return NextResponse.json(
     {

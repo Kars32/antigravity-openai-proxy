@@ -194,6 +194,29 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Module-scoped O(1) catalog lookup map and hoisted RegExp/Intl instances to avoid per-call allocation overhead.
+const OPENCODE_MODELS_MAP = new Map<string, ResolvedOpenCodeModel>(
+  OPENCODE_MODELS.map(m => [
+    m.id,
+    {
+      wireModel: m.wireModel,
+      isFast: m.isFast,
+      canonicalId: m.id,
+    },
+  ])
+);
+
+const IS_FAST_REGEX = /^(fast|off|no-?think|no_think|zero)$/i;
+const IS_THINKING_REGEX = /^(thinking|think|thought|deep)$/i;
+
+const IST_DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
+});
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -206,27 +229,13 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
+  // Exact ID match from catalog via O(1) map
+  const exact = OPENCODE_MODELS_MAP.get(clean);
   if (exact) {
-    return {
-      wireModel: exact.wireModel,
-      isFast: exact.isFast,
-      canonicalId: exact.id,
-    };
+    return exact;
   }
 
-  // Helper to detect fast/no-think suffix variant
-  const isFastSuffix = (suffix: string) => {
-    return /^(fast|off|no-?think|no_think|zero)$/i.test(suffix);
-  };
-
-  // Helper to detect thinking suffix
-  const isThinkingSuffix = (suffix: string) => {
-    return /^(thinking|think|thought|deep)$/i.test(suffix);
-  };
-
-  // Helper to match a base model and its separator
+  // Helper to match a base model and its separator using hoisted RegExps
   const matchModelVariant = (
     baseNames: string[],
     wireModel: string,
@@ -238,10 +247,10 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
       }
       if (clean.startsWith(base + '-') || clean.startsWith(base + ':')) {
         const suffix = clean.slice(base.length + 1);
-        if (isFastSuffix(suffix)) {
+        if (IS_FAST_REGEX.test(suffix)) {
           return { wireModel, isFast: true, canonicalId: `${canonicalBase}-fast` };
         }
-        if (isThinkingSuffix(suffix)) {
+        if (IS_THINKING_REGEX.test(suffix)) {
           return { wireModel, isFast: false, canonicalId: canonicalBase };
         }
       }
@@ -311,13 +320,7 @@ export async function executeOpenCodeCompletion({
 
   if (availableAccounts.length === 0) {
     const minCooldownSec = Math.min(...OPENCODE_GUEST_ACCOUNTS.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))));
-    const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    }).format(new Date(now + minCooldownSec * 1000)) + ' IST';
+    const refreshTimeStr = IST_DATE_FORMATTER.format(new Date(now + minCooldownSec * 1000)) + ' IST';
 
     const accountBreakdown = OPENCODE_GUEST_ACCOUNTS.map(a => `${a.name}: Cooldown (${Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))}s)`).join(' | ');
 

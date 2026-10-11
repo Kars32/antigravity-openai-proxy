@@ -228,7 +228,34 @@ async function runAsyncTests() {
     global.fetch = originalFetch;
   }
 
-  console.log('\nAll 10 test suites passed successfully!');
+  // Test 11: O(1) Model Resolution (resolveModel & resolveOpenCodeModel)
+  const { resolveModel } = await import('./lib/models');
+  const { resolveOpenCodeModel } = await import('./lib/opencode');
+  const { transformOpenAIToolsToGoogle } = await import('./lib/tools');
+
+  const m1 = resolveModel('gemini-3.8-flash-high');
+  assert.strictEqual(m1?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(m1?.defaultThinkingBudget, 24576);
+
+  const m2 = resolveOpenCodeModel('big-pickle-fast');
+  assert.strictEqual(m2?.wireModel, 'big-pickle');
+  assert.strictEqual(m2?.isFast, true);
+
+  console.log('✓ Test 11: Fast model resolution lookups passed');
+
+  // Test 12: Single-pass tool translation
+  const toolsInput: any = [
+    { type: 'function', function: { name: 'search_code', description: 'Search repo', parameters: { type: 'object' } } },
+    { type: 'function', function: { name: 'read_file', description: 'Read file content' } }
+  ];
+  const transformedTools = transformOpenAIToolsToGoogle(toolsInput);
+  assert.strictEqual(transformedTools?.length, 1);
+  assert.strictEqual(transformedTools[0].functionDeclarations.length, 2);
+  assert.strictEqual(transformedTools[0].functionDeclarations[0].name, 'search_code');
+  assert.strictEqual(transformedTools[0].functionDeclarations[1].name, 'read_file');
+  console.log('✓ Test 12: Single-pass tool translation passed');
+
+  console.log('\nAll 12 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

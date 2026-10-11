@@ -6,6 +6,9 @@ import { checkAuth, handleOptions } from '@/lib/completions';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Pre-index OpenCode model IDs for O(1) set membership check during /v1/models listing
+const OPENCODE_MODEL_IDS = new Set(OPENCODE_MODELS.map(om => om.id));
+
 export async function OPTIONS() {
   return handleOptions();
 }
@@ -22,7 +25,7 @@ export async function GET(req: NextRequest) {
     id: m.id,
     object: 'model',
     created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
+    owned_by: OPENCODE_MODEL_IDS.has(m.id) ? 'opencode' : 'google-antigravity',
     permission: [],
     root: m.wireModel,
     parent: null,

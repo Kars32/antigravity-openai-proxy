@@ -22,6 +22,9 @@ export interface OpenCodeGuestAccount {
   successCount: number;
 }
 
+// Pre-index OpenCode models into a Map for O(1) exact lookups
+export const OPENCODE_MODEL_MAP = new Map<string, OpenCodeModelSpec>();
+
 // Verified working OpenCode free models & their no-think / fast variants
 export const OPENCODE_MODELS: OpenCodeModelSpec[] = [
   // 1. Big Pickle (DeepSeek Thinking & Fast)
@@ -145,6 +148,11 @@ export const OPENCODE_MODELS: OpenCodeModelSpec[] = [
   },
 ];
 
+// Populate the O(1) Map lookup index
+for (const m of OPENCODE_MODELS) {
+  OPENCODE_MODEL_MAP.set(m.id, m);
+}
+
 // 16 persistent guest sessions with valid RFC4122 v4 UUIDs
 export const OPENCODE_GUEST_ACCOUNTS: OpenCodeGuestAccount[] = [
   { id: 'opencode-guest-1', name: 'OpenCode Guest 1', sessionId: '3303e814-8561-4baf-a01a-a97a8431e672', cooldownUntil: 0, failCount: 0, successCount: 0 },
@@ -206,8 +214,8 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
+  // Exact ID match from catalog (O(1) Map lookup)
+  const exact = OPENCODE_MODEL_MAP.get(clean);
   if (exact) {
     return {
       wireModel: exact.wireModel,

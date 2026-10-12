@@ -14,6 +14,8 @@ const UPSTREAM_URLS = [
   'https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse',
 ];
 
+const textEncoder = new TextEncoder();
+
 export function checkAuth(req: NextRequest): boolean {
   const proxyKey = process.env.PROXY_API_KEY;
   if (!proxyKey) return true;
@@ -140,8 +142,9 @@ export async function handleChatCompletions(req: NextRequest) {
 
   const otherAccounts = accounts.filter(a => a.id !== primaryAccount?.id);
   const orderedAccounts = primaryAccount ? [primaryAccount, ...otherAccounts] : accounts;
+  const availableIds = new Set(availableAccounts.map(a => a.id));
   const accountsToTry = availableAccounts.length > 0
-    ? orderedAccounts.filter(a => availableAccounts.some(avail => avail.id === a.id))
+    ? orderedAccounts.filter(a => availableIds.has(a.id))
     : orderedAccounts;
 
   const attemptLogs: { account: string; status: number; error: string }[] = [];
@@ -195,7 +198,7 @@ export async function handleChatCompletions(req: NextRequest) {
 
       // 1. Streaming Response
       if (stream) {
-        const encoder = new TextEncoder();
+        const streamCreated = Math.floor(Date.now() / 1000);
         const decoder = new TextDecoder();
         const chatcmplId = `chatcmpl-${crypto.randomUUID().slice(0, 8)}`;
         let toolCallIndex = 0;
@@ -230,11 +233,11 @@ export async function handleChatCompletions(req: NextRequest) {
                           const text = part.text || '';
                           if (text) {
                             controller.enqueue(
-                              encoder.encode(
+                              textEncoder.encode(
                                 `data: ${JSON.stringify({
                                   id: chatcmplId,
                                   object: 'chat.completion.chunk',
-                                  created: Math.floor(Date.now() / 1000),
+                                  created: streamCreated,
                                   model: modelId,
                                   choices: [
                                     {
@@ -251,11 +254,11 @@ export async function handleChatCompletions(req: NextRequest) {
 
                         if (part.text && !part.thought) {
                           controller.enqueue(
-                            encoder.encode(
+                            textEncoder.encode(
                               `data: ${JSON.stringify({
                                 id: chatcmplId,
                                 object: 'chat.completion.chunk',
-                                created: Math.floor(Date.now() / 1000),
+                                created: streamCreated,
                                 model: modelId,
                                 choices: [
                                   {
@@ -286,11 +289,11 @@ export async function handleChatCompletions(req: NextRequest) {
                           }
 
                           controller.enqueue(
-                            encoder.encode(
+                            textEncoder.encode(
                               `data: ${JSON.stringify({
                                 id: chatcmplId,
                                 object: 'chat.completion.chunk',
-                                created: Math.floor(Date.now() / 1000),
+                                created: streamCreated,
                                 model: modelId,
                                 choices: [
                                   {
@@ -312,11 +315,11 @@ export async function handleChatCompletions(req: NextRequest) {
               }
 
               controller.enqueue(
-                encoder.encode(
+                textEncoder.encode(
                   `data: ${JSON.stringify({
                     id: chatcmplId,
                     object: 'chat.completion.chunk',
-                    created: Math.floor(Date.now() / 1000),
+                    created: streamCreated,
                     model: modelId,
                     choices: [
                       {
@@ -328,7 +331,7 @@ export async function handleChatCompletions(req: NextRequest) {
                   })}\n\n`
                 )
               );
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.enqueue(textEncoder.encode('data: [DONE]\n\n'));
               controller.close();
             } catch (err) {
               controller.error(err);

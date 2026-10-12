@@ -235,96 +235,68 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// O(1) Pre-indexed lookup map for supported models and aliases
+const MODEL_LOOKUP_MAP = new Map<string, { wireModel: string; defaultThinkingBudget: number }>();
+
+// 1. Populate alias fallback mappings
+const g38Max = { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
+const g38High = { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
+const g38Med = { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 };
+const g38Low = { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
+const g38Fast = { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 0 };
+
+['gemini-3.8-flash-max', 'gemini-3.8-flash:max', 'gemini-3.8-flash-xhigh'].forEach(a => MODEL_LOOKUP_MAP.set(a, g38Max));
+['gemini-3.8-flash-high', 'gemini-3.8-flash:high'].forEach(a => MODEL_LOOKUP_MAP.set(a, g38High));
+['gemini-3.8-flash-medium', 'gemini-3.8-flash-mid', 'gemini-3.8-flash:medium', 'gemini-3.8-flash:mid', 'gemini-3.8-flash', 'gemini-3.8-flash-tiered'].forEach(a => MODEL_LOOKUP_MAP.set(a, g38Med));
+['gemini-3.8-flash-low', 'gemini-3.8-flash:low'].forEach(a => MODEL_LOOKUP_MAP.set(a, g38Low));
+['gemini-3.8-flash-fast', 'gemini-3.8-flash:fast', 'gemini-3.8-flash-off', 'gemini-3.8-flash:off'].forEach(a => MODEL_LOOKUP_MAP.set(a, g38Fast));
+
+const g37Max = { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65536 };
+const g37High = { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
+const g37Med = { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
+const g37Low = { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
+const g37Fast = { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
+
+['gemini-3.7-flash-max', 'gemini-3.7-flash:max', 'gemini-3.7-flash-xhigh'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Max));
+['gemini-3.7-flash-high', 'gemini-3.7-flash:high'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37High));
+['gemini-3.7-flash-medium', 'gemini-3.7-flash-mid', 'gemini-3.7-flash:medium', 'gemini-3.7-flash:mid', 'gemini-3.7-flash'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Med));
+['gemini-3.7-flash-low', 'gemini-3.7-flash:low'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Low));
+['gemini-3.7-flash-fast', 'gemini-3.7-flash:fast', 'gemini-3.7-flash-off', 'gemini-3.7-flash:off'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Fast));
+
+['gemini-3.6-flash-high', 'gemini-3.6-flash:high'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 16384 }));
+['gemini-3.6-flash-medium', 'gemini-3.6-flash-mid', 'gemini-3.6-flash:medium', 'gemini-3.6-flash:mid', 'gemini-3.6-flash'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Med));
+['gemini-3.6-flash-low', 'gemini-3.6-flash:low'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Low));
+
+['gemini-3.1-pro-low', 'gemini-3.1-pro:low'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 4096 }));
+['gemini-3.1-pro', 'gemini-pro-agent', 'gemini-pro'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 32768 }));
+
+['gemini-3.5-flash', 'gemini-3-flash-agent'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'gemini-3-flash-agent', defaultThinkingBudget: 0 }));
+MODEL_LOOKUP_MAP.set('gemini-2.5-flash', { wireModel: 'gemini-2.5-flash', defaultThinkingBudget: 0 });
+
+['claude-sonnet-4-6', 'claude-sonnet-4.6', 'claude-3-7-sonnet', 'claude-3-5-sonnet', 'claude-sonnet'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 }));
+['claude-opus-4-6-thinking', 'claude-opus-4-6', 'claude-opus'].forEach(a => MODEL_LOOKUP_MAP.set(a, { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 }));
+
+['gpt-4o', 'gpt-4', 'gpt-3.5-turbo'].forEach(a => MODEL_LOOKUP_MAP.set(a, g37Med));
+MODEL_LOOKUP_MAP.set('gpt-4o-mini', g37Low);
+
+// 2. Exact SUPPORTED_MODELS IDs override aliases with top priority
+for (const m of SUPPORTED_MODELS) {
+  MODEL_LOOKUP_MAP.set(m.id.toLowerCase(), { wireModel: m.wireModel, defaultThinkingBudget: m.defaultThinkingBudget });
+}
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
-  if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
-  }
-
-  // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.8-flash-high' || clean === 'gemini-3.8-flash:high') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.8-flash-medium' || clean === 'gemini-3.8-flash-mid' || clean === 'gemini-3.8-flash:medium' || clean === 'gemini-3.8-flash:mid' || clean === 'gemini-3.8-flash' || clean === 'gemini-3.8-flash-tiered') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.8-flash-low' || clean === 'gemini-3.8-flash:low') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.8-flash-fast' || clean === 'gemini-3.8-flash:fast' || clean === 'gemini-3.8-flash-off' || clean === 'gemini-3.8-flash:off') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.7 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.7-flash-max' || clean === 'gemini-3.7-flash:max' || clean === 'gemini-3.7-flash-xhigh') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.7-flash-medium' || clean === 'gemini-3.7-flash-mid' || clean === 'gemini-3.7-flash:medium' || clean === 'gemini-3.7-flash:mid' || clean === 'gemini-3.7-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.7-flash-low' || clean === 'gemini-3.7-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.7-flash-fast' || clean === 'gemini-3.7-flash:fast' || clean === 'gemini-3.7-flash-off' || clean === 'gemini-3.7-flash:off') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.6 Flash variants (mapped to flash-tiered with appropriate thinking budgets)
-  if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'gemini-3.6-flash-medium' || clean === 'gemini-3.6-flash-mid' || clean === 'gemini-3.6-flash:medium' || clean === 'gemini-3.6-flash:mid' || clean === 'gemini-3.6-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.6-flash-low' || clean === 'gemini-3.6-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-
-  // Gemini 3.1 Pro variants
-  if (clean === 'gemini-3.1-pro-low' || clean === 'gemini-3.1-pro:low') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 4096 };
-  }
-  if (clean === 'gemini-3.1-pro' || clean === 'gemini-pro-agent' || clean === 'gemini-pro') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 32768 };
-  }
-
-  // Fast flash models
-  if (clean === 'gemini-3.5-flash' || clean === 'gemini-3-flash-agent') {
-    return { wireModel: 'gemini-3-flash-agent', defaultThinkingBudget: 0 };
-  }
-  if (clean === 'gemini-2.5-flash') {
-    return { wireModel: 'gemini-2.5-flash', defaultThinkingBudget: 0 };
-  }
-
-  // Claude models
-  if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6' || clean === 'claude-3-7-sonnet' || clean === 'claude-3-5-sonnet' || clean === 'claude-sonnet') {
-    return { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus') {
-    return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 };
-  }
-
-  // OpenAI aliases
-  if (clean === 'gpt-4o' || clean === 'gpt-4' || clean === 'gpt-3.5-turbo') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gpt-4o-mini') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
+  // O(1) instant map lookup
+  const cached = MODEL_LOOKUP_MAP.get(clean);
+  if (cached) return cached;
 
   // Google internal wire format pass-through
   if (clean.startsWith('publishers/google/models/') || clean.startsWith('models/')) {
-    return { wireModel: clean, defaultThinkingBudget: 8192 };
+    const res = { wireModel: clean, defaultThinkingBudget: 8192 };
+    MODEL_LOOKUP_MAP.set(clean, res);
+    return res;
   }
 
   return null;

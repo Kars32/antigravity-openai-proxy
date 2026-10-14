@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-04 - Bounded Model Resolution Memoization & DoS Prevention
+**Learning:** Caching string resolution results for untrusted user inputs (such as OpenAI `model` parameter values) in serverless proxy gateways can become an OOM/DoS vulnerability if negative/null lookup results are cached without bounds.
+**Action:** Pre-populate resolution Maps with exact static model catalog IDs and frozen spec objects, set a hard `MAX_CACHE_SIZE` limit for dynamic alias lookups, and never cache `null` / invalid lookup results for arbitrary untrusted request strings.

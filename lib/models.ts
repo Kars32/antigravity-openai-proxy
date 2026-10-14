@@ -235,10 +235,54 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Pre-computed lookup set for OpenCode model ownership check
+const OPENCODE_MODEL_IDS = new Set(OPENCODE_MODELS.map(m => m.id));
+
+// Static response data for /v1/models endpoints (eliminates O(N*M) scans and per-request allocations)
+export const PRECOMPUTED_MODELS_DATA = SUPPORTED_MODELS.map(m => Object.freeze({
+  id: m.id,
+  object: 'model',
+  created: 1700000000,
+  owned_by: OPENCODE_MODEL_IDS.has(m.id) ? 'opencode' : 'google-antigravity',
+  permission: [],
+  root: m.wireModel,
+  parent: null,
+}));
+
+// Performance optimization: O(1) resolution cache to prevent repeated array scans and string regex evaluations.
+// Bounded size limit prevents potential memory growth on untrusted model input strings.
+const MAX_MODEL_CACHE_SIZE = 100;
+const modelResolutionCache = new Map<string, { wireModel: string; defaultThinkingBudget: number }>();
+
+// Pre-populate cache with exact model IDs
+for (const m of SUPPORTED_MODELS) {
+  modelResolutionCache.set(m.id, Object.freeze({ wireModel: m.wireModel, defaultThinkingBudget: m.defaultThinkingBudget }));
+}
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
+  // Fast O(1) cache lookup
+  const cached = modelResolutionCache.get(clean);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = computeResolvedModel(clean);
+  if (result) {
+    const frozen = Object.freeze(result);
+    if (modelResolutionCache.size < MAX_MODEL_CACHE_SIZE) {
+      modelResolutionCache.set(clean, frozen);
+    }
+    return frozen;
+  }
+
+  // Do NOT cache null results for arbitrary unknown inputs to prevent memory leaks or DoS
+  return null;
+}
+
+function computeResolvedModel(clean: string): { wireModel: string; defaultThinkingBudget: number } | null {
   // Exact ID match
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {

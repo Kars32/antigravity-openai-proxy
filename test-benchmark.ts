@@ -40,3 +40,27 @@ const elapsed = performance.now() - start;
 console.log(`Completed ${ITERATIONS} iterations in ${elapsed.toFixed(2)}ms`);
 console.log(`Average latency per transform: ${(elapsed / ITERATIONS).toFixed(4)}ms (${((elapsed / ITERATIONS) * 1000).toFixed(1)}µs)`);
 console.log(`Throughput: ${Math.round((ITERATIONS / elapsed) * 1000)} transforms/sec`);
+
+// Benchmark model resolution
+import { resolveModel } from './lib/models';
+import { resolveOpenCodeModel } from './lib/opencode';
+
+console.log('\nBenchmarking resolveModel & resolveOpenCodeModel...');
+const testModels = [
+  'gemini-3.8-flash-high', 'gemini-3.7-flash', 'gpt-4o',
+  'big-pickle', 'big-pickle-fast', 'mimo-v2.5-free-fast',
+  'claude-sonnet-4-6', 'nemotron-3-ultra-free', 'gemini-3.1-pro', 'gpt-4o-mini'
+];
+
+const RESOLVE_ITERATIONS = 500000;
+const startResolve = performance.now();
+for (let i = 0; i < RESOLVE_ITERATIONS; i++) {
+  const m = testModels[i % testModels.length];
+  const o = resolveOpenCodeModel(m);
+  if (!o) resolveModel(m);
+}
+const elapsedResolve = performance.now() - startResolve;
+
+console.log(`Completed ${RESOLVE_ITERATIONS} model resolutions in ${elapsedResolve.toFixed(2)}ms`);
+console.log(`Average latency per resolution: ${(elapsedResolve / RESOLVE_ITERATIONS * 1000).toFixed(2)}ns`);
+console.log(`Throughput: ${Math.round((RESOLVE_ITERATIONS / elapsedResolve) * 1000)} resolutions/sec`);

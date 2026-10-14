@@ -194,6 +194,20 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Performance optimization: O(1) resolution cache for OpenCode models.
+// Bounded size limit prevents potential memory growth on untrusted model input strings.
+const MAX_OPENCODE_CACHE_SIZE = 100;
+const openCodeModelResolutionCache = new Map<string, ResolvedOpenCodeModel>();
+
+// Pre-populate cache with exact catalog items
+for (const m of OPENCODE_MODELS) {
+  openCodeModelResolutionCache.set(m.id, Object.freeze({
+    wireModel: m.wireModel,
+    isFast: m.isFast,
+    canonicalId: m.id,
+  }));
+}
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -201,6 +215,26 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
   clean = clean.replace(/^(models\/|opencode\/)/, '');
 
+  // Fast O(1) cache lookup
+  const cached = openCodeModelResolutionCache.get(clean);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = computeResolvedOpenCodeModel(clean);
+  if (result) {
+    const frozen = Object.freeze(result);
+    if (openCodeModelResolutionCache.size < MAX_OPENCODE_CACHE_SIZE) {
+      openCodeModelResolutionCache.set(clean, frozen);
+    }
+    return frozen;
+  }
+
+  // Do NOT cache null results for arbitrary unknown inputs to prevent memory leaks or DoS
+  return null;
+}
+
+function computeResolvedOpenCodeModel(clean: string): ResolvedOpenCodeModel | null {
   // Exclude non-working or delisted models explicitly
   if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {
     return null;

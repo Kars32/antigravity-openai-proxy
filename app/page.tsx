@@ -409,6 +409,7 @@ for await (const chunk of stream) {
           )}
           <button
             onClick={handleLogout}
+            aria-label="Lock Gateway and clear master key"
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
           >
             🔒 Lock Gateway
@@ -443,7 +444,7 @@ for await (const chunk of stream) {
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
+      <div role="tablist" aria-label="Control Center Navigation" style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
         {[
           { id: 'models', label: '🧠 Native Antigravity Models' },
           { id: 'quickstart', label: '⚡ Quickstart & Code' },
@@ -452,6 +453,10 @@ for await (const chunk of stream) {
         ].map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`panel-${tab.id}`}
+            id={`tab-${tab.id}`}
             onClick={() => setActiveTab(tab.id as any)}
             style={{
               backgroundColor: activeTab === tab.id ? '#27272a' : 'transparent',
@@ -471,7 +476,7 @@ for await (const chunk of stream) {
 
       {/* TAB 1: Models Catalog */}
       {activeTab === 'models' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div id="panel-models" role="tabpanel" aria-labelledby="tab-models" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {NATIVE_ANTIGRAVITY_MODELS.map(group => (
             <div key={group.group}>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
@@ -499,6 +504,7 @@ for await (const chunk of stream) {
                       <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
                       <button
                         onClick={() => copyToClipboard(m.id, m.id)}
+                        aria-label={`Copy model ID ${m.id}`}
                         style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
                       >
                         {copiedField === m.id ? '✓' : 'Copy'}
@@ -514,9 +520,9 @@ for await (const chunk of stream) {
 
       {/* TAB 2: Quickstart Code Snippets */}
       {activeTab === 'quickstart' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-quickstart" role="tabpanel" aria-labelledby="tab-quickstart" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div role="tablist" aria-label="Code Snippet Languages" style={{ display: 'flex', gap: 6 }}>
               {[
                 { id: 'python', label: 'Python SDK' },
                 { id: 'curl', label: 'cURL' },
@@ -524,6 +530,8 @@ for await (const chunk of stream) {
               ].map(st => (
                 <button
                   key={st.id}
+                  role="tab"
+                  aria-selected={codeTab === st.id}
                   onClick={() => setCodeTab(st.id as any)}
                   style={{
                     backgroundColor: codeTab === st.id ? '#27272a' : 'transparent',
@@ -545,6 +553,7 @@ for await (const chunk of stream) {
                 const code = codeTab === 'python' ? pythonCode : codeTab === 'curl' ? curlCode : nodeCode;
                 copyToClipboard(code, 'code');
               }}
+              aria-label={`Copy ${codeTab} code snippet`}
               style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
             >
               {copiedField === 'code' ? '✓ Copied' : 'Copy Snippet'}
@@ -559,7 +568,7 @@ for await (const chunk of stream) {
 
       {/* TAB 3: Interactive Testing Console */}
       {activeTab === 'test' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div id="panel-test" role="tabpanel" aria-labelledby="tab-test" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
@@ -669,7 +678,7 @@ for await (const chunk of stream) {
 
       {/* TAB 4: Account Pool Health */}
       {activeTab === 'accounts' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px 0' }}>Google Account Pool & Rate Limit Failover</h2>
           <p style={{ fontSize: 13, color: '#a1a1aa', margin: '0 0 20px 0' }}>
             Generation requests are automatically distributed 50/50 across active Google OAuth accounts.

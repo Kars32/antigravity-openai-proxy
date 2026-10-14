@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SUPPORTED_MODELS } from '@/lib/models';
-import { OPENCODE_MODELS } from '@/lib/opencode';
+import { PRECOMPUTED_MODELS_DATA } from '@/lib/models';
 import { checkAuth, handleOptions } from '@/lib/completions';
 
 export const runtime = 'nodejs';
@@ -18,18 +17,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const data = SUPPORTED_MODELS.map(m => ({
-    id: m.id,
-    object: 'model',
-    created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
-    permission: [],
-    root: m.wireModel,
-    parent: null,
-  }));
-
+  // Return pre-computed frozen model list data (O(1) response generation)
   return NextResponse.json(
-    { object: 'list', data },
+    { object: 'list', data: PRECOMPUTED_MODELS_DATA },
     { headers: { 'Access-Control-Allow-Origin': '*' } }
   );
 }

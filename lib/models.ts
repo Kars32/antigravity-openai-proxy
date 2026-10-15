@@ -235,14 +235,39 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Static O(1) map for exact supported model lookups
+const SUPPORTED_MODEL_MAP = new Map<string, { wireModel: string; defaultThinkingBudget: number }>();
+for (const m of SUPPORTED_MODELS) {
+  SUPPORTED_MODEL_MAP.set(m.id, { wireModel: m.wireModel, defaultThinkingBudget: m.defaultThinkingBudget });
+}
+
+// Bounded memoization cache (max 500 entries) for O(1) model resolution
+const modelResolutionCache = new Map<string, { wireModel: string; defaultThinkingBudget: number } | null>();
+const MAX_CACHE_SIZE = 500;
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
+  if (modelResolutionCache.has(clean)) {
+    return modelResolutionCache.get(clean)!;
+  }
+
+  const result = computeModelResolution(clean);
+
+  if (modelResolutionCache.size >= MAX_CACHE_SIZE) {
+    modelResolutionCache.clear();
+  }
+  modelResolutionCache.set(clean, result);
+
+  return result;
+}
+
+function computeModelResolution(clean: string): { wireModel: string; defaultThinkingBudget: number } | null {
+  // Exact O(1) Map lookup
+  const exact = SUPPORTED_MODEL_MAP.get(clean);
   if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+    return exact;
   }
 
   // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)

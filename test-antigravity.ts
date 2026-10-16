@@ -228,7 +228,19 @@ async function runAsyncTests() {
     global.fetch = originalFetch;
   }
 
-  console.log('\nAll 10 test suites passed successfully!');
+  // Test 11: Precomputed models response payload validation
+  const { PRECOMPUTED_MODELS_RESPONSE, SUPPORTED_MODELS } = await import('./lib/models');
+  assert.strictEqual(PRECOMPUTED_MODELS_RESPONSE.object, 'list');
+  assert.strictEqual(PRECOMPUTED_MODELS_RESPONSE.data.length, SUPPORTED_MODELS.length);
+  const sampleGemini = PRECOMPUTED_MODELS_RESPONSE.data.find(m => m.id === 'gemini-3.8-flash');
+  const sampleOpencode = PRECOMPUTED_MODELS_RESPONSE.data.find(m => m.id === 'big-pickle');
+  assert.ok(sampleGemini);
+  assert.strictEqual(sampleGemini?.owned_by, 'google-antigravity');
+  assert.ok(sampleOpencode);
+  assert.strictEqual(sampleOpencode?.owned_by, 'opencode');
+  console.log('✓ Test 11: Precomputed models response payload passed');
+
+  console.log('\nAll 11 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

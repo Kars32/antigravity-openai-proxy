@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-04 - Upstream SSE Chunk Buffer Line Processing
+**Learning:** In LLM proxy gateways streaming high-frequency SSE event chunks, using `buffer.split('\n')` on every chunk read forces the V8 runtime to scan the buffer, allocate a new Array object, and allocate new string objects for every line on every chunk. In long streaming responses with hundreds of chunks, this generates heavy Garbage Collection (GC) pressure and CPU overhead in the event loop.
+**Action:** Use a single-pass `while ((newlineIdx = buffer.indexOf('\n')) !== -1)` slicing loop (`buffer.slice(0, newlineIdx)`) to extract lines dynamically without creating intermediate array allocations.

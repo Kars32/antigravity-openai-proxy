@@ -194,6 +194,41 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Module-scoped regular expressions to prevent re-compilation per resolution request
+const FAST_SUFFIX_REGEX = /^(fast|off|no-?think|no_think|zero)$/i;
+const THINKING_SUFFIX_REGEX = /^(thinking|think|thought|deep)$/i;
+
+// Pre-built O(1) Map cache for OpenCode models and common aliases
+const OPENCODE_MODEL_MAP = new Map<string, ResolvedOpenCodeModel>();
+
+for (const m of OPENCODE_MODELS) {
+  OPENCODE_MODEL_MAP.set(m.id, {
+    wireModel: m.wireModel,
+    isFast: m.isFast,
+    canonicalId: m.id,
+  });
+}
+
+// Populate common OpenCode aliases
+const OPENCODE_ALIAS_LIST: Array<[string[], ResolvedOpenCodeModel]> = [
+  [['big-pickle-off', 'big-pickle-no-think', 'big-pickle-nothink', 'big-pickle-zero'], { wireModel: 'big-pickle', isFast: true, canonicalId: 'big-pickle-fast' }],
+  [['big-pickle-thinking', 'big-pickle-think', 'big-pickle-deep'], { wireModel: 'big-pickle', isFast: false, canonicalId: 'big-pickle' }],
+  [['mimo-v2.5', 'mimo-2.5-free', 'mimo-2.5'], { wireModel: 'mimo-v2.5-free', isFast: false, canonicalId: 'mimo-v2.5-free' }],
+  [['mimo-v2.5-free-fast', 'mimo-v2.5-fast', 'mimo-2.5-fast', 'mimo-v2.5-off', 'mimo-v2.5-free-off'], { wireModel: 'mimo-v2.5-free', isFast: true, canonicalId: 'mimo-v2.5-free-fast' }],
+  [['ling-3.0-flash-free', 'ling-3.0-flash-fin', 'ling-3.0-flash'], { wireModel: 'ling-3.0-flash-fin-free', isFast: false, canonicalId: 'ling-3.0-flash-fin-free' }],
+  [['ling-3.0-flash-fin-free-fast', 'ling-3.0-flash-fast', 'ling-3.0-flash-free-fast', 'ling-3.0-flash-off'], { wireModel: 'ling-3.0-flash-fin-free', isFast: true, canonicalId: 'ling-3.0-flash-fin-free-fast' }],
+  [['nemotron-3-ultra', 'nemotron-ultra-free', 'nemotron-ultra'], { wireModel: 'nemotron-3-ultra-free', isFast: false, canonicalId: 'nemotron-3-ultra-free' }],
+  [['nemotron-3-ultra-free-fast', 'nemotron-3-ultra-fast', 'nemotron-ultra-fast', 'nemotron-ultra-off'], { wireModel: 'nemotron-3-ultra-free', isFast: true, canonicalId: 'nemotron-3-ultra-free-fast' }],
+  [['nemotron-3.5-lightning', 'nemotron-lightning-free', 'nemotron-lightning'], { wireModel: 'nemotron-3.5-lightning-free', isFast: false, canonicalId: 'nemotron-3.5-lightning-free' }],
+  [['nemotron-3.5-lightning-free-fast', 'nemotron-3.5-lightning-fast', 'nemotron-lightning-fast', 'nemotron-lightning-off'], { wireModel: 'nemotron-3.5-lightning-free', isFast: true, canonicalId: 'nemotron-3.5-lightning-free-fast' }],
+];
+
+for (const [aliases, spec] of OPENCODE_ALIAS_LIST) {
+  for (const alias of aliases) {
+    OPENCODE_MODEL_MAP.set(alias, spec);
+  }
+}
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -206,25 +241,9 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
-  if (exact) {
-    return {
-      wireModel: exact.wireModel,
-      isFast: exact.isFast,
-      canonicalId: exact.id,
-    };
-  }
-
-  // Helper to detect fast/no-think suffix variant
-  const isFastSuffix = (suffix: string) => {
-    return /^(fast|off|no-?think|no_think|zero)$/i.test(suffix);
-  };
-
-  // Helper to detect thinking suffix
-  const isThinkingSuffix = (suffix: string) => {
-    return /^(thinking|think|thought|deep)$/i.test(suffix);
-  };
+  // O(1) Fast-path map lookup
+  const cached = OPENCODE_MODEL_MAP.get(clean);
+  if (cached) return cached;
 
   // Helper to match a base model and its separator
   const matchModelVariant = (
@@ -238,10 +257,10 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
       }
       if (clean.startsWith(base + '-') || clean.startsWith(base + ':')) {
         const suffix = clean.slice(base.length + 1);
-        if (isFastSuffix(suffix)) {
+        if (FAST_SUFFIX_REGEX.test(suffix)) {
           return { wireModel, isFast: true, canonicalId: `${canonicalBase}-fast` };
         }
-        if (isThinkingSuffix(suffix)) {
+        if (THINKING_SUFFIX_REGEX.test(suffix)) {
           return { wireModel, isFast: false, canonicalId: canonicalBase };
         }
       }

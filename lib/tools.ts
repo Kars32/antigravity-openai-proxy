@@ -10,9 +10,11 @@ export interface OpenAITool {
 export function transformOpenAIToolsToGoogle(tools?: OpenAITool[]): any[] | undefined {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return undefined;
 
-  const functionDeclarations = tools
-    .filter(t => t && t.type === 'function' && t.function && t.function.name)
-    .map(t => {
+  // Single-pass conversion: avoids intermediate array allocations from filter().map()
+  const functionDeclarations: any[] = [];
+  for (let i = 0; i < tools.length; i++) {
+    const t = tools[i];
+    if (t && t.type === 'function' && t.function && t.function.name) {
       const decl: any = {
         name: t.function.name,
         description: t.function.description || '',
@@ -20,8 +22,9 @@ export function transformOpenAIToolsToGoogle(tools?: OpenAITool[]): any[] | unde
       if (t.function.parameters) {
         decl.parameters = t.function.parameters;
       }
-      return decl;
-    });
+      functionDeclarations.push(decl);
+    }
+  }
 
   if (functionDeclarations.length === 0) return undefined;
   return [{ functionDeclarations }];

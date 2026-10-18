@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-04 - Hot Path Model Resolution & Regex Re-compilation Overhead
+**Learning:** On every completion request, `resolveModel` and `resolveOpenCodeModel` executed linear array scans (`SUPPORTED_MODELS.find`, `OPENCODE_MODELS.find`), sequential `if/else` alias checks, and in-function RegExp instantiations (`/^(fast|off|...)$/i`). In high-throughput proxy operation, this added unnecessary per-request CPU cycle latency and GC allocations.
+**Action:** Always pre-build module-level O(1) Map caches (`MODEL_MAP`, `OPENCODE_MODEL_MAP`) at startup for supported models and aliases, and hoist RegExp patterns to module scope.

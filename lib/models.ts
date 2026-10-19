@@ -235,10 +235,29 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Bounded resolution cache: converts model lookup from O(N) linear array scan + multi-conditional parsing
+// to O(1) Map lookup on repeated requests.
+const modelResolutionCache = new Map<string, { wireModel: string; defaultThinkingBudget: number } | null>();
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
+  if (modelResolutionCache.has(clean)) {
+    return modelResolutionCache.get(clean)!;
+  }
+
+  const result = resolveModelInternal(clean);
+
+  if (modelResolutionCache.size >= 500) {
+    modelResolutionCache.clear();
+  }
+  modelResolutionCache.set(clean, result);
+
+  return result;
+}
+
+function resolveModelInternal(clean: string): { wireModel: string; defaultThinkingBudget: number } | null {
   // Exact ID match
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {

@@ -194,12 +194,31 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Bounded resolution cache: converts OpenCode model lookup from O(N) array scans + variant matching
+// to O(1) Map lookup on repeated requests.
+const openCodeResolutionCache = new Map<string, ResolvedOpenCodeModel | null>();
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
-  let clean = modelId.trim().toLowerCase();
+  const clean = modelId.trim().toLowerCase();
 
+  if (openCodeResolutionCache.has(clean)) {
+    return openCodeResolutionCache.get(clean)!;
+  }
+
+  const result = resolveOpenCodeModelInternal(clean);
+
+  if (openCodeResolutionCache.size >= 500) {
+    openCodeResolutionCache.clear();
+  }
+  openCodeResolutionCache.set(clean, result);
+
+  return result;
+}
+
+function resolveOpenCodeModelInternal(rawClean: string): ResolvedOpenCodeModel | null {
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
-  clean = clean.replace(/^(models\/|opencode\/)/, '');
+  const clean = rawClean.replace(/^(models\/|opencode\/)/, '');
 
   // Exclude non-working or delisted models explicitly
   if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {

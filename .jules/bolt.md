@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-20 - Multi-Pass Account Selection & O(N*M) Model Ownership Filtering
+**Learning:** Selecting fallback account candidates across Google CloudCode PA and OpenCode pools previously performed 5 separate passes per completion request (`filter`, `pickAccount`, `findIndex`, rotation loop, and nested `filter.some`), causing high garbage collection overhead and 4.14µs latency overhead per request. In addition, `/v1/models` performed an O(N*M) nested `.some()` search per model.
+**Action:** Extract round-robin candidate accounts and cooldown wait times in a single pass (`getCandidateAccounts` and `getCandidateOpenCodeAccounts`), and use a module-level `Set` for O(1) model ownership checks.

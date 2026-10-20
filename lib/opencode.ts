@@ -188,6 +188,39 @@ export function pickOpenCodeAccount(): OpenCodeGuestAccount {
   return best;
 }
 
+// Single-pass round-robin OpenCode guest account candidate selection:
+// Collects non-cooling guest accounts starting from nextGuestIdx in a single traversal,
+// eliminating redundant array allocations and findIndex lookups.
+export function getCandidateOpenCodeAccounts(): { candidateAccounts: OpenCodeGuestAccount[]; minWaitSec: number } {
+  const now = Date.now();
+  const candidateAccounts: OpenCodeGuestAccount[] = [];
+  let minCooldown = Infinity;
+  let firstAvailableIdx = -1;
+
+  for (let i = 0; i < OPENCODE_GUEST_ACCOUNTS.length; i++) {
+    const idx = (nextGuestIdx + i) % OPENCODE_GUEST_ACCOUNTS.length;
+    const acc = OPENCODE_GUEST_ACCOUNTS[idx];
+    if (acc.cooldownUntil <= now) {
+      if (firstAvailableIdx === -1) {
+        firstAvailableIdx = idx;
+      }
+      candidateAccounts.push(acc);
+    } else {
+      if (acc.cooldownUntil < minCooldown) {
+        minCooldown = acc.cooldownUntil;
+      }
+    }
+  }
+
+  if (firstAvailableIdx !== -1) {
+    nextGuestIdx = (firstAvailableIdx + 1) % OPENCODE_GUEST_ACCOUNTS.length;
+  }
+
+  const minWaitSec = minCooldown !== Infinity ? Math.max(1, Math.ceil((minCooldown - now) / 1000)) : 1;
+
+  return { candidateAccounts: candidateAccounts.length > 0 ? candidateAccounts : OPENCODE_GUEST_ACCOUNTS, minWaitSec };
+}
+
 export interface ResolvedOpenCodeModel {
   wireModel: string;
   isFast: boolean;
@@ -306,29 +339,29 @@ export async function executeOpenCodeCompletion({
   onFinish,
 }: ExecuteOpenCodeOptions): Promise<NextResponse> {
   const isStream = body.stream === true;
+  const { candidateAccounts, minWaitSec } = getCandidateOpenCodeAccounts();
   const now = Date.now();
-  const availableAccounts = OPENCODE_GUEST_ACCOUNTS.filter(a => a.cooldownUntil <= now);
+  const isAllCooling = OPENCODE_GUEST_ACCOUNTS.every(a => a.cooldownUntil > now);
 
-  if (availableAccounts.length === 0) {
-    const minCooldownSec = Math.min(...OPENCODE_GUEST_ACCOUNTS.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))));
+  if (isAllCooling) {
     const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: true
-    }).format(new Date(now + minCooldownSec * 1000)) + ' IST';
+    }).format(new Date(now + minWaitSec * 1000)) + ' IST';
 
     const accountBreakdown = OPENCODE_GUEST_ACCOUNTS.map(a => `${a.name}: Cooldown (${Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))}s)`).join(' | ');
 
     return NextResponse.json(
       {
         error: {
-          message: `[OpenCode Rate Limit]: All 16 OpenCode guest accounts are rate-limited. [${accountBreakdown}]. Refreshing in ${minCooldownSec}s (Ready at ${refreshTimeStr}). Please wait ${minCooldownSec}s before retrying.`,
+          message: `[OpenCode Rate Limit]: All 16 OpenCode guest accounts are rate-limited. [${accountBreakdown}]. Refreshing in ${minWaitSec}s (Ready at ${refreshTimeStr}). Please wait ${minWaitSec}s before retrying.`,
           type: 'upstream_rate_limit',
           code: 429,
-          retry_after: minCooldownSec,
-          refresh_in_seconds: minCooldownSec,
+          retry_after: minWaitSec,
+          refresh_in_seconds: minWaitSec,
           ready_at: refreshTimeStr,
         }
       },
@@ -336,7 +369,7 @@ export async function executeOpenCodeCompletion({
         status: 429,
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Retry-After': String(minCooldownSec),
+          'Retry-After': String(minWaitSec),
         }
       }
     );
@@ -358,16 +391,6 @@ export async function executeOpenCodeCompletion({
     opencodePayload.thinking = { type: 'disabled' };
     delete opencodePayload.max_thinking_tokens;
   }
-
-  // Cyclic round-robin order starting from picked account
-  const primaryAccount = pickOpenCodeAccount();
-  const primaryIdx = OPENCODE_GUEST_ACCOUNTS.findIndex(a => a.id === primaryAccount.id);
-  const orderedAccounts: OpenCodeGuestAccount[] = [];
-  for (let i = 0; i < OPENCODE_GUEST_ACCOUNTS.length; i++) {
-    const idx = (primaryIdx + i) % OPENCODE_GUEST_ACCOUNTS.length;
-    orderedAccounts.push(OPENCODE_GUEST_ACCOUNTS[idx]);
-  }
-  const candidateAccounts = orderedAccounts.filter(a => a.cooldownUntil <= Date.now());
 
   const maxAttempts = candidateAccounts.length;
   let lastError = '';

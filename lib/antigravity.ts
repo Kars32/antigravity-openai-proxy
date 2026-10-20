@@ -101,6 +101,44 @@ export function pickAccount(): AccountConfig {
   return best;
 }
 
+// Single-pass round-robin account candidate selection:
+// Evaluates account cooldowns in a single pass starting from nextAccountIdx, returning candidate accounts in
+// round-robin order and advancing nextAccountIdx without multi-pass array filtering or O(N^2) searches.
+export function getCandidateAccounts(): { candidateAccounts: AccountConfig[]; minWaitSec: number } {
+  const accounts = getAccounts();
+  if (accounts.length === 0) {
+    return { candidateAccounts: [], minWaitSec: 0 };
+  }
+
+  const now = Date.now();
+  const candidateAccounts: AccountConfig[] = [];
+  let minCooldown = Infinity;
+  let firstAvailableIdx = -1;
+
+  for (let i = 0; i < accounts.length; i++) {
+    const idx = (nextAccountIdx + i) % accounts.length;
+    const acc = accounts[idx];
+    if (acc.cooldownUntil <= now) {
+      if (firstAvailableIdx === -1) {
+        firstAvailableIdx = idx;
+      }
+      candidateAccounts.push(acc);
+    } else {
+      if (acc.cooldownUntil < minCooldown) {
+        minCooldown = acc.cooldownUntil;
+      }
+    }
+  }
+
+  if (firstAvailableIdx !== -1) {
+    nextAccountIdx = (firstAvailableIdx + 1) % accounts.length;
+  }
+
+  const minWaitSec = minCooldown !== Infinity ? Math.max(1, Math.ceil((minCooldown - now) / 1000)) : 1;
+
+  return { candidateAccounts: candidateAccounts.length > 0 ? candidateAccounts : accounts, minWaitSec };
+}
+
 const tokenRefreshInFlight = new Map<string, Promise<string>>();
 
 export async function getAccessToken(account: AccountConfig): Promise<string> {

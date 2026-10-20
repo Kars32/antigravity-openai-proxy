@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import {
   getAccounts,
-  pickAccount,
+  getCandidateAccounts,
   getAccessToken,
   transformOpenAIToAntigravity,
 } from './antigravity';
@@ -89,12 +89,11 @@ export async function handleChatCompletions(req: NextRequest) {
     );
   }
 
+  const { candidateAccounts: accountsToTry, minWaitSec } = getCandidateAccounts();
   const now = Date.now();
-  const availableAccounts = accounts.filter(a => a.cooldownUntil <= now);
+  const isAllCooling = accounts.length > 0 && accounts.every(a => a.cooldownUntil > now);
 
-  if (availableAccounts.length === 0 && accounts.length > 0) {
-    const remainingTimes = accounts.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000)));
-    const minWaitSec = Math.min(...remainingTimes);
+  if (isAllCooling) {
     const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
       hour: '2-digit',
@@ -130,19 +129,6 @@ export async function handleChatCompletions(req: NextRequest) {
       }
     );
   }
-
-  let primaryAccount: any;
-  try {
-    primaryAccount = pickAccount();
-  } catch {
-    primaryAccount = availableAccounts[0] || accounts[0];
-  }
-
-  const otherAccounts = accounts.filter(a => a.id !== primaryAccount?.id);
-  const orderedAccounts = primaryAccount ? [primaryAccount, ...otherAccounts] : accounts;
-  const accountsToTry = availableAccounts.length > 0
-    ? orderedAccounts.filter(a => availableAccounts.some(avail => avail.id === a.id))
-    : orderedAccounts;
 
   const attemptLogs: { account: string; status: number; error: string }[] = [];
 

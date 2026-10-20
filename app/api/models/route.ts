@@ -10,6 +10,8 @@ export async function OPTIONS() {
   return handleOptions();
 }
 
+const OPENCODE_MODEL_IDS = new Set(OPENCODE_MODELS.map(om => om.id));
+
 export async function GET(req: NextRequest) {
   if (!checkAuth(req)) {
     return NextResponse.json(
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     id: m.id,
     object: 'model',
     created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
+    owned_by: OPENCODE_MODEL_IDS.has(m.id) ? 'opencode' : 'google-antigravity',
     permission: [],
     root: m.wireModel,
     parent: null,

@@ -187,8 +187,50 @@ const res9 = transformOpenAIToAntigravity(
 assert.strictEqual(res9.request.contents[0].parts[0].text, 'Hello\nworld\nfrom test');
 console.log('✓ Test 9: Mixed array content extraction passed');
 
-// Test 10: Single-flight OAuth token deduplication
+// Test 10: Model resolution memoization and single-pass tool transformation
+async function runModelResolutionTests() {
+  const { resolveModel } = await import('./lib/models');
+  const { resolveOpenCodeModel } = await import('./lib/opencode');
+  const { transformOpenAIToolsToGoogle } = await import('./lib/tools');
+
+  // Test OpenCode models
+  const opencode1 = resolveOpenCodeModel('big-pickle-fast');
+  assert.strictEqual(opencode1?.wireModel, 'big-pickle');
+  assert.strictEqual(opencode1?.isFast, true);
+
+  const opencode2 = resolveOpenCodeModel('mimo-v2.5-free');
+  assert.strictEqual(opencode2?.wireModel, 'mimo-v2.5-free');
+  assert.strictEqual(opencode2?.isFast, false);
+
+  // Test standard models
+  const m1 = resolveModel('gemini-3.8-flash');
+  assert.strictEqual(m1?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(m1?.defaultThinkingBudget, 8192);
+
+  const m2 = resolveModel('claude-sonnet-4-6');
+  assert.strictEqual(m2?.wireModel, 'claude-sonnet-4-6');
+  assert.strictEqual(m2?.defaultThinkingBudget, 16384);
+
+  const m3 = resolveModel('gpt-4o');
+  assert.strictEqual(m3?.wireModel, 'gemini-3.7-flash-tiered');
+
+  // Test tool transformation
+  const tools = [
+    {
+      type: 'function' as const,
+      function: { name: 'test_tool', description: 'Test', parameters: { type: 'object' } }
+    }
+  ];
+  const transformedTools = transformOpenAIToolsToGoogle(tools);
+  assert.strictEqual(transformedTools?.length, 1);
+  assert.strictEqual(transformedTools[0].functionDeclarations[0].name, 'test_tool');
+
+  console.log('✓ Test 11: Model resolution & tool transformation passed');
+}
+
+// Test 11: Single-flight OAuth token deduplication
 async function runAsyncTests() {
+  await runModelResolutionTests();
   const { getAccessToken } = await import('./lib/antigravity');
   const originalFetch = global.fetch;
   let fetchCount = 0;

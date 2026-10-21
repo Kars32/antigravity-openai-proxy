@@ -235,14 +235,19 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Module-level static Map for O(1) exact model lookups
+const SUPPORTED_EXACT_MAP = new Map<string, { wireModel: string; defaultThinkingBudget: number }>(
+  SUPPORTED_MODELS.map(m => [m.id, { wireModel: m.wireModel, defaultThinkingBudget: m.defaultThinkingBudget }])
+);
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
+  // Exact ID match via static O(1) Map lookup
+  const exact = SUPPORTED_EXACT_MAP.get(clean);
   if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+    return exact;
   }
 
   // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
@@ -279,7 +284,7 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
   }
 
-  // Gemini 3.6 Flash variants (mapped to flash-tiered with appropriate thinking budgets)
+  // Gemini 3.6 Flash variants
   if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 16384 };
   }

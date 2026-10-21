@@ -194,6 +194,13 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Hoisted static regexes to avoid dynamic RegExp instantiation overhead during model resolution calls
+const FAST_SUFFIX_REGEX = /^(fast|off|no-?think|no_think|zero)$/i;
+const THINKING_SUFFIX_REGEX = /^(thinking|think|thought|deep)$/i;
+
+// Module-level static Map for O(1) exact model lookups
+const OPENCODE_EXACT_MAP = new Map<string, OpenCodeModelSpec>(OPENCODE_MODELS.map(m => [m.id, m]));
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -206,8 +213,8 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
+  // Exact ID match from static catalog via O(1) map
+  const exact = OPENCODE_EXACT_MAP.get(clean);
   if (exact) {
     return {
       wireModel: exact.wireModel,
@@ -215,16 +222,6 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
       canonicalId: exact.id,
     };
   }
-
-  // Helper to detect fast/no-think suffix variant
-  const isFastSuffix = (suffix: string) => {
-    return /^(fast|off|no-?think|no_think|zero)$/i.test(suffix);
-  };
-
-  // Helper to detect thinking suffix
-  const isThinkingSuffix = (suffix: string) => {
-    return /^(thinking|think|thought|deep)$/i.test(suffix);
-  };
 
   // Helper to match a base model and its separator
   const matchModelVariant = (
@@ -238,10 +235,10 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
       }
       if (clean.startsWith(base + '-') || clean.startsWith(base + ':')) {
         const suffix = clean.slice(base.length + 1);
-        if (isFastSuffix(suffix)) {
+        if (FAST_SUFFIX_REGEX.test(suffix)) {
           return { wireModel, isFast: true, canonicalId: `${canonicalBase}-fast` };
         }
-        if (isThinkingSuffix(suffix)) {
+        if (THINKING_SUFFIX_REGEX.test(suffix)) {
           return { wireModel, isFast: false, canonicalId: canonicalBase };
         }
       }
@@ -249,47 +246,13 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   };
 
-  // 1. Big Pickle
-  const bigPickleMatch = matchModelVariant(
-    ['big-pickle'],
-    'big-pickle',
-    'big-pickle'
+  return (
+    matchModelVariant(['big-pickle'], 'big-pickle', 'big-pickle') ||
+    matchModelVariant(['mimo-v2.5-free', 'mimo-v2.5', 'mimo-2.5-free', 'mimo-2.5'], 'mimo-v2.5-free', 'mimo-v2.5-free') ||
+    matchModelVariant(['ling-3.0-flash-fin-free', 'ling-3.0-flash-free', 'ling-3.0-flash-fin', 'ling-3.0-flash'], 'ling-3.0-flash-fin-free', 'ling-3.0-flash-fin-free') ||
+    matchModelVariant(['nemotron-3-ultra-free', 'nemotron-3-ultra', 'nemotron-ultra-free', 'nemotron-ultra'], 'nemotron-3-ultra-free', 'nemotron-3-ultra-free') ||
+    matchModelVariant(['nemotron-3.5-lightning-free', 'nemotron-3.5-lightning', 'nemotron-lightning-free', 'nemotron-lightning'], 'nemotron-3.5-lightning-free', 'nemotron-3.5-lightning-free')
   );
-  if (bigPickleMatch) return bigPickleMatch;
-
-  // 2. Xiaomi MiMo v2.5 Free
-  const mimoMatch = matchModelVariant(
-    ['mimo-v2.5-free', 'mimo-v2.5', 'mimo-2.5-free', 'mimo-2.5'],
-    'mimo-v2.5-free',
-    'mimo-v2.5-free'
-  );
-  if (mimoMatch) return mimoMatch;
-
-  // 3. Ling 3.0 Flash Free
-  const lingMatch = matchModelVariant(
-    ['ling-3.0-flash-fin-free', 'ling-3.0-flash-free', 'ling-3.0-flash-fin', 'ling-3.0-flash'],
-    'ling-3.0-flash-fin-free',
-    'ling-3.0-flash-fin-free'
-  );
-  if (lingMatch) return lingMatch;
-
-  // 4. NVIDIA Nemotron 3 Ultra Free
-  const nemotronUltraMatch = matchModelVariant(
-    ['nemotron-3-ultra-free', 'nemotron-3-ultra', 'nemotron-ultra-free', 'nemotron-ultra'],
-    'nemotron-3-ultra-free',
-    'nemotron-3-ultra-free'
-  );
-  if (nemotronUltraMatch) return nemotronUltraMatch;
-
-  // 5. NVIDIA Nemotron 3.5 Lightning Free
-  const nemotronLightningMatch = matchModelVariant(
-    ['nemotron-3.5-lightning-free', 'nemotron-3.5-lightning', 'nemotron-lightning-free', 'nemotron-lightning'],
-    'nemotron-3.5-lightning-free',
-    'nemotron-3.5-lightning-free'
-  );
-  if (nemotronLightningMatch) return nemotronLightningMatch;
-
-  return null;
 }
 
 export interface ExecuteOpenCodeOptions {

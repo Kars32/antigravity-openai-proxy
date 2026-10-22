@@ -227,8 +227,9 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
               <input
+                id="master-key-input"
                 type="password"
                 placeholder="KARS-..."
                 value={loginKeyInput}
@@ -239,7 +240,7 @@ export default function AntigravityOpenAIControlCenter() {
             </div>
 
             {loginError && (
-              <div style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
+              <div role="alert" aria-live="assertive" style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
                 {loginError}
               </div>
             )}
@@ -564,8 +565,9 @@ for await (const chunk of stream) {
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="test-model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="test-model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,8 +617,9 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <label htmlFor="test-prompt-input" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
               <textarea
+                id="test-prompt-input"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
@@ -660,7 +663,7 @@ for await (const chunk of stream) {
               </div>
             )}
 
-            <div style={{ flex: 1, backgroundColor: '#09090b', border: '1px solid #1f1f23', borderRadius: 8, padding: 16, overflowY: 'auto', minHeight: 200, fontSize: 13, color: '#f4f4f5', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+            <div role="status" aria-live="polite" aria-busy={isTesting} style={{ flex: 1, backgroundColor: '#09090b', border: '1px solid #1f1f23', borderRadius: 8, padding: 16, overflowY: 'auto', minHeight: 200, fontSize: 13, color: '#f4f4f5', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
               {testOutput || (isTesting ? 'Waiting for model stream...' : 'Response output will stream here.')}
             </div>
           </div>

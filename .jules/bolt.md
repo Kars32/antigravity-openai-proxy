@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-05 - Model Specification Resolution & Catalog List Memoization
+**Learning:** High-frequency model resolution in completion gateway endpoints repeatedly executed linear array searches (`SUPPORTED_MODELS.find`) and string suffix regex matches, while model list endpoints (`/v1/models`) re-mapped and executed $O(N \times M)$ nested `.some()` array lookups on every request.
+**Action:** Wrap specification resolvers in bounded `Map` caches (capped at max entries to prevent memory growth) and pre-compute static model catalog lists (`MODEL_RESPONSE_DATA`) at module load using `Set` for constant-time ownership checks.

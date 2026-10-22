@@ -1,0 +1,3 @@
+## 2025-03-08 - Accessible Forms & Dynamic Live Regions in Control Center
+**Learning:** In Next.js control panel applications with dynamic single-page forms and live streaming test consoles, visual form labels need explicit `htmlFor` association with inputs/textareas, and dynamic output containers require `role="status"`, `aria-live="polite"`, and `aria-busy` attributes to ensure screen readers announce status updates and live responses cleanly.
+**Action:** Always link form controls with explicit `htmlFor`/`id` pairs and mark streaming output elements with `role="status"` and `aria-live="polite"`.

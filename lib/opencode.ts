@@ -194,6 +194,10 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Bounded resolution cache to provide sub-microsecond O(1) OpenCode model specification lookup
+const OPENCODE_RESOLUTION_CACHE = new Map<string, ResolvedOpenCodeModel | null>();
+const MAX_CACHE_SIZE = 500;
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -201,6 +205,20 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
   clean = clean.replace(/^(models\/|opencode\/)/, '');
 
+  if (OPENCODE_RESOLUTION_CACHE.has(clean)) {
+    return OPENCODE_RESOLUTION_CACHE.get(clean)!;
+  }
+
+  const res = internalResolveOpenCodeModel(clean);
+
+  if (OPENCODE_RESOLUTION_CACHE.size >= MAX_CACHE_SIZE) {
+    OPENCODE_RESOLUTION_CACHE.clear();
+  }
+  OPENCODE_RESOLUTION_CACHE.set(clean, res);
+  return res;
+}
+
+function internalResolveOpenCodeModel(clean: string): ResolvedOpenCodeModel | null {
   // Exclude non-working or delisted models explicitly
   if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {
     return null;

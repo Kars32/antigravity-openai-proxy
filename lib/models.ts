@@ -235,10 +235,41 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+const OPENCODE_MODEL_IDS = new Set(OPENCODE_MODELS.map(om => om.id));
+
+// Pre-computed model list response data for high-performance /v1/models endpoint
+export const MODEL_RESPONSE_DATA = SUPPORTED_MODELS.map(m => ({
+  id: m.id,
+  object: 'model' as const,
+  created: 1700000000,
+  owned_by: OPENCODE_MODEL_IDS.has(m.id) ? 'opencode' : 'google-antigravity',
+  permission: [],
+  root: m.wireModel,
+  parent: null,
+}));
+
+// Bounded resolution cache to provide sub-microsecond O(1) model specification lookup
+const RESOLUTION_CACHE = new Map<string, { wireModel: string; defaultThinkingBudget: number } | null>();
+const MAX_CACHE_SIZE = 500;
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
+  if (RESOLUTION_CACHE.has(clean)) {
+    return RESOLUTION_CACHE.get(clean)!;
+  }
+
+  const res = internalResolveModel(clean);
+
+  if (RESOLUTION_CACHE.size >= MAX_CACHE_SIZE) {
+    RESOLUTION_CACHE.clear();
+  }
+  RESOLUTION_CACHE.set(clean, res);
+  return res;
+}
+
+function internalResolveModel(clean: string): { wireModel: string; defaultThinkingBudget: number } | null {
   // Exact ID match
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {

@@ -198,6 +198,7 @@ export async function handleChatCompletions(req: NextRequest) {
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
         const chatcmplId = `chatcmpl-${crypto.randomUUID().slice(0, 8)}`;
+        const createdTime = Math.floor(Date.now() / 1000);
         let toolCallIndex = 0;
 
         const customStream = new ReadableStream({
@@ -234,7 +235,7 @@ export async function handleChatCompletions(req: NextRequest) {
                                 `data: ${JSON.stringify({
                                   id: chatcmplId,
                                   object: 'chat.completion.chunk',
-                                  created: Math.floor(Date.now() / 1000),
+                                  created: createdTime,
                                   model: modelId,
                                   choices: [
                                     {
@@ -255,7 +256,7 @@ export async function handleChatCompletions(req: NextRequest) {
                               `data: ${JSON.stringify({
                                 id: chatcmplId,
                                 object: 'chat.completion.chunk',
-                                created: Math.floor(Date.now() / 1000),
+                                created: createdTime,
                                 model: modelId,
                                 choices: [
                                   {
@@ -290,7 +291,7 @@ export async function handleChatCompletions(req: NextRequest) {
                               `data: ${JSON.stringify({
                                 id: chatcmplId,
                                 object: 'chat.completion.chunk',
-                                created: Math.floor(Date.now() / 1000),
+                                created: createdTime,
                                 model: modelId,
                                 choices: [
                                   {
@@ -316,7 +317,7 @@ export async function handleChatCompletions(req: NextRequest) {
                   `data: ${JSON.stringify({
                     id: chatcmplId,
                     object: 'chat.completion.chunk',
-                    created: Math.floor(Date.now() / 1000),
+                    created: createdTime,
                     model: modelId,
                     choices: [
                       {

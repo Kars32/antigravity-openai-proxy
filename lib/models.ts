@@ -235,91 +235,114 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Static O(1) resolution map for model IDs and common aliases.
+// Eliminates linear array scans (SUPPORTED_MODELS.find) and sequential if-branch chains on every completion request.
+const MODEL_RESOLUTION_MAP = new Map<string, { wireModel: string; defaultThinkingBudget: number }>();
+
+function registerResolution(alias: string, wireModel: string, defaultThinkingBudget: number) {
+  MODEL_RESOLUTION_MAP.set(alias.toLowerCase(), { wireModel, defaultThinkingBudget });
+}
+
+// 1. Register explicit model alias variants & thinking tiers
+// Gemini 3.8 Flash
+registerResolution('gemini-3.8-flash-max', 'gemini-3.8-flash-tiered', 65536);
+registerResolution('gemini-3.8-flash:max', 'gemini-3.8-flash-tiered', 65536);
+registerResolution('gemini-3.8-flash-xhigh', 'gemini-3.8-flash-tiered', 65536);
+
+registerResolution('gemini-3.8-flash-high', 'gemini-3.8-flash-tiered', 24576);
+registerResolution('gemini-3.8-flash:high', 'gemini-3.8-flash-tiered', 24576);
+
+registerResolution('gemini-3.8-flash-medium', 'gemini-3.8-flash-tiered', 8192);
+registerResolution('gemini-3.8-flash-mid', 'gemini-3.8-flash-tiered', 8192);
+registerResolution('gemini-3.8-flash:medium', 'gemini-3.8-flash-tiered', 8192);
+registerResolution('gemini-3.8-flash:mid', 'gemini-3.8-flash-tiered', 8192);
+registerResolution('gemini-3.8-flash', 'gemini-3.8-flash-tiered', 8192);
+registerResolution('gemini-3.8-flash-tiered', 'gemini-3.8-flash-tiered', 8192);
+
+registerResolution('gemini-3.8-flash-low', 'gemini-3.8-flash-tiered', 2048);
+registerResolution('gemini-3.8-flash:low', 'gemini-3.8-flash-tiered', 2048);
+
+registerResolution('gemini-3.8-flash-fast', 'gemini-3.8-flash-tiered', 0);
+registerResolution('gemini-3.8-flash:fast', 'gemini-3.8-flash-tiered', 0);
+registerResolution('gemini-3.8-flash-off', 'gemini-3.8-flash-tiered', 0);
+registerResolution('gemini-3.8-flash:off', 'gemini-3.8-flash-tiered', 0);
+
+// Gemini 3.7 Flash
+registerResolution('gemini-3.7-flash-max', 'gemini-3.7-flash-tiered', 65536);
+registerResolution('gemini-3.7-flash:max', 'gemini-3.7-flash-tiered', 65536);
+registerResolution('gemini-3.7-flash-xhigh', 'gemini-3.7-flash-tiered', 65536);
+
+registerResolution('gemini-3.7-flash-high', 'gemini-3.7-flash-tiered', 24576);
+registerResolution('gemini-3.7-flash:high', 'gemini-3.7-flash-tiered', 24576);
+
+registerResolution('gemini-3.7-flash-medium', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.7-flash-mid', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.7-flash:medium', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.7-flash:mid', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.7-flash', 'gemini-3.7-flash-tiered', 8192);
+
+registerResolution('gemini-3.7-flash-low', 'gemini-3.7-flash-tiered', 2048);
+registerResolution('gemini-3.7-flash:low', 'gemini-3.7-flash-tiered', 2048);
+
+registerResolution('gemini-3.7-flash-fast', 'gemini-3.7-flash-tiered', 0);
+registerResolution('gemini-3.7-flash:fast', 'gemini-3.7-flash-tiered', 0);
+registerResolution('gemini-3.7-flash-off', 'gemini-3.7-flash-tiered', 0);
+registerResolution('gemini-3.7-flash:off', 'gemini-3.7-flash-tiered', 0);
+
+// Gemini 3.6 Flash
+registerResolution('gemini-3.6-flash-high', 'gemini-3.7-flash-tiered', 16384);
+registerResolution('gemini-3.6-flash:high', 'gemini-3.7-flash-tiered', 16384);
+
+registerResolution('gemini-3.6-flash-medium', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.6-flash-mid', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.6-flash:medium', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.6-flash:mid', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gemini-3.6-flash', 'gemini-3.7-flash-tiered', 8192);
+
+registerResolution('gemini-3.6-flash-low', 'gemini-3.7-flash-tiered', 2048);
+registerResolution('gemini-3.6-flash:low', 'gemini-3.7-flash-tiered', 2048);
+
+// Gemini 3.1 Pro
+registerResolution('gemini-3.1-pro-low', 'gemini-pro-agent', 4096);
+registerResolution('gemini-3.1-pro:low', 'gemini-pro-agent', 4096);
+registerResolution('gemini-3.1-pro', 'gemini-pro-agent', 32768);
+registerResolution('gemini-pro-agent', 'gemini-pro-agent', 32768);
+registerResolution('gemini-pro', 'gemini-pro-agent', 32768);
+
+// Fast Flash
+registerResolution('gemini-3.5-flash', 'gemini-3-flash-agent', 0);
+registerResolution('gemini-3-flash-agent', 'gemini-3-flash-agent', 0);
+registerResolution('gemini-2.5-flash', 'gemini-2.5-flash', 0);
+
+// Claude
+registerResolution('claude-sonnet-4-6', 'claude-sonnet-4-6', 16384);
+registerResolution('claude-sonnet-4.6', 'claude-sonnet-4-6', 16384);
+registerResolution('claude-3-7-sonnet', 'claude-sonnet-4-6', 16384);
+registerResolution('claude-3-5-sonnet', 'claude-sonnet-4-6', 16384);
+registerResolution('claude-sonnet', 'claude-sonnet-4-6', 16384);
+
+registerResolution('claude-opus-4-6-thinking', 'claude-opus-4-6-thinking', 16384);
+registerResolution('claude-opus-4-6', 'claude-opus-4-6-thinking', 16384);
+registerResolution('claude-opus', 'claude-opus-4-6-thinking', 16384);
+
+// OpenAI Aliases
+registerResolution('gpt-4o', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gpt-4', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gpt-3.5-turbo', 'gemini-3.7-flash-tiered', 8192);
+registerResolution('gpt-4o-mini', 'gemini-3.7-flash-tiered', 2048);
+
+// 2. Register base models from SUPPORTED_MODELS catalog (ensures exact catalog IDs take precedence)
+for (const m of SUPPORTED_MODELS) {
+  registerResolution(m.id, m.wireModel, m.defaultThinkingBudget);
+}
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
+  const exact = MODEL_RESOLUTION_MAP.get(clean);
   if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
-  }
-
-  // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.8-flash-high' || clean === 'gemini-3.8-flash:high') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.8-flash-medium' || clean === 'gemini-3.8-flash-mid' || clean === 'gemini-3.8-flash:medium' || clean === 'gemini-3.8-flash:mid' || clean === 'gemini-3.8-flash' || clean === 'gemini-3.8-flash-tiered') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.8-flash-low' || clean === 'gemini-3.8-flash:low') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.8-flash-fast' || clean === 'gemini-3.8-flash:fast' || clean === 'gemini-3.8-flash-off' || clean === 'gemini-3.8-flash:off') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.7 Flash variants (high, max, medium/mid, low, fast/off)
-  if (clean === 'gemini-3.7-flash-max' || clean === 'gemini-3.7-flash:max' || clean === 'gemini-3.7-flash-xhigh') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65536 };
-  }
-  if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };
-  }
-  if (clean === 'gemini-3.7-flash-medium' || clean === 'gemini-3.7-flash-mid' || clean === 'gemini-3.7-flash:medium' || clean === 'gemini-3.7-flash:mid' || clean === 'gemini-3.7-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.7-flash-low' || clean === 'gemini-3.7-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-  if (clean === 'gemini-3.7-flash-fast' || clean === 'gemini-3.7-flash:fast' || clean === 'gemini-3.7-flash-off' || clean === 'gemini-3.7-flash:off') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 0 };
-  }
-
-  // Gemini 3.6 Flash variants (mapped to flash-tiered with appropriate thinking budgets)
-  if (clean === 'gemini-3.6-flash-high' || clean === 'gemini-3.6-flash:high') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'gemini-3.6-flash-medium' || clean === 'gemini-3.6-flash-mid' || clean === 'gemini-3.6-flash:medium' || clean === 'gemini-3.6-flash:mid' || clean === 'gemini-3.6-flash') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gemini-3.6-flash-low' || clean === 'gemini-3.6-flash:low') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
-  }
-
-  // Gemini 3.1 Pro variants
-  if (clean === 'gemini-3.1-pro-low' || clean === 'gemini-3.1-pro:low') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 4096 };
-  }
-  if (clean === 'gemini-3.1-pro' || clean === 'gemini-pro-agent' || clean === 'gemini-pro') {
-    return { wireModel: 'gemini-pro-agent', defaultThinkingBudget: 32768 };
-  }
-
-  // Fast flash models
-  if (clean === 'gemini-3.5-flash' || clean === 'gemini-3-flash-agent') {
-    return { wireModel: 'gemini-3-flash-agent', defaultThinkingBudget: 0 };
-  }
-  if (clean === 'gemini-2.5-flash') {
-    return { wireModel: 'gemini-2.5-flash', defaultThinkingBudget: 0 };
-  }
-
-  // Claude models
-  if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6' || clean === 'claude-3-7-sonnet' || clean === 'claude-3-5-sonnet' || clean === 'claude-sonnet') {
-    return { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 };
-  }
-  if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus') {
-    return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 };
-  }
-
-  // OpenAI aliases
-  if (clean === 'gpt-4o' || clean === 'gpt-4' || clean === 'gpt-3.5-turbo') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 8192 };
-  }
-  if (clean === 'gpt-4o-mini') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
+    return exact;
   }
 
   // Google internal wire format pass-through

@@ -205,7 +205,7 @@ export default function AntigravityOpenAIControlCenter() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090b', color: '#a1a1aa', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#22c55e', margin: '0 auto 12px auto', animation: 'pulse 1.5s infinite' }}></div>
+          <div aria-hidden="true" style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#22c55e', margin: '0 auto 12px auto', animation: 'pulse 1.5s infinite' }}></div>
           <div style={{ fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Authenticating Gateway...</div>
         </div>
       </div>
@@ -219,7 +219,7 @@ export default function AntigravityOpenAIControlCenter() {
         <div style={{ width: '100%', maxWidth: 420, backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 16, padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 12, backgroundColor: '#18181b', border: '1px solid #27272a', marginBottom: 16 }}>
-              🔒
+              <span aria-hidden="true">🔒</span>
             </div>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>Antigravity OpenAI Proxy</h1>
             <p style={{ fontSize: 13, color: '#a1a1aa', margin: 0 }}>Enter your master API key to access developer console</p>
@@ -227,19 +227,22 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
               <input
+                id="master-key-input"
                 type="password"
                 placeholder="KARS-..."
                 value={loginKeyInput}
                 onChange={(e) => setLoginKeyInput(e.target.value)}
+                aria-invalid={!!loginError}
+                aria-describedby={loginError ? 'login-error-msg' : undefined}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: '10px 14px', color: '#f4f4f5', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                 autoFocus
               />
             </div>
 
             {loginError && (
-              <div style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
+              <div id="login-error-msg" role="alert" style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
                 {loginError}
               </div>
             )}
@@ -247,6 +250,7 @@ export default function AntigravityOpenAIControlCenter() {
             <button
               type="submit"
               disabled={isVerifying || !loginKeyInput.trim()}
+              aria-label="Unlock Gateway"
               style={{
                 width: '100%',
                 backgroundColor: isVerifying || !loginKeyInput.trim() ? '#27272a' : '#ffffff',
@@ -390,7 +394,7 @@ for await (const chunk of stream) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32, borderBottom: '1px solid #27272a', paddingBottom: 20 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
+            <span aria-hidden="true" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></span>
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>Antigravity OpenAI Proxy</h1>
             <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa' }}>
               Native Antigravity Wire Gateway
@@ -409,6 +413,7 @@ for await (const chunk of stream) {
           )}
           <button
             onClick={handleLogout}
+            aria-label="Lock Gateway and logout"
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
           >
             🔒 Lock Gateway
@@ -429,12 +434,14 @@ for await (const chunk of stream) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => copyToClipboard(`${DOMAIN}/v1`, 'base_url')}
+            aria-label="Copy active OpenAI Base URL"
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
           >
             {copiedField === 'base_url' ? '✓ Copied Base URL' : '📋 Copy Base URL'}
           </button>
           <button
             onClick={() => copyToClipboard(apiKey, 'key')}
+            aria-label="Copy Master API Key"
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
           >
             {copiedField === 'key' ? '✓ Copied API Key' : '🔑 Copy API Key'}
@@ -443,7 +450,7 @@ for await (const chunk of stream) {
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
+      <div role="tablist" aria-label="Dashboard sections" style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
         {[
           { id: 'models', label: '🧠 Native Antigravity Models' },
           { id: 'quickstart', label: '⚡ Quickstart & Code' },
@@ -452,6 +459,10 @@ for await (const chunk of stream) {
         ].map(tab => (
           <button
             key={tab.id}
+            id={`tab-${tab.id}`}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`panel-${tab.id}`}
             onClick={() => setActiveTab(tab.id as any)}
             style={{
               backgroundColor: activeTab === tab.id ? '#27272a' : 'transparent',
@@ -471,7 +482,7 @@ for await (const chunk of stream) {
 
       {/* TAB 1: Models Catalog */}
       {activeTab === 'models' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div id="panel-models" role="tabpanel" aria-labelledby="tab-models" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {NATIVE_ANTIGRAVITY_MODELS.map(group => (
             <div key={group.group}>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
@@ -499,6 +510,7 @@ for await (const chunk of stream) {
                       <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
                       <button
                         onClick={() => copyToClipboard(m.id, m.id)}
+                        aria-label={`Copy model ID ${m.id}`}
                         style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
                       >
                         {copiedField === m.id ? '✓' : 'Copy'}
@@ -514,7 +526,7 @@ for await (const chunk of stream) {
 
       {/* TAB 2: Quickstart Code Snippets */}
       {activeTab === 'quickstart' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-quickstart" role="tabpanel" aria-labelledby="tab-quickstart" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 6 }}>
               {[
@@ -559,13 +571,14 @@ for await (const chunk of stream) {
 
       {/* TAB 3: Interactive Testing Console */}
       {activeTab === 'test' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div id="panel-test" role="tabpanel" aria-labelledby="tab-test" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="selected-model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="selected-model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,8 +628,9 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <label htmlFor="test-prompt-textarea" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
               <textarea
+                id="test-prompt-textarea"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
@@ -669,7 +683,7 @@ for await (const chunk of stream) {
 
       {/* TAB 4: Account Pool Health */}
       {activeTab === 'accounts' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px 0' }}>Google Account Pool & Rate Limit Failover</h2>
           <p style={{ fontSize: 13, color: '#a1a1aa', margin: '0 0 20px 0' }}>
             Generation requests are automatically distributed 50/50 across active Google OAuth accounts.

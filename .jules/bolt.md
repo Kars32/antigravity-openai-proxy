@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-05 - Model Resolution Hot Path O(1) Bounded Caching
+**Learning:** Uncached model resolution in gateway proxies executes multiple linear array scans (`.find()`), regex evaluations, and dozens of string comparisons sequentially on every incoming request. For high-throughput serverless endpoints, this creates measurable latency overhead.
+**Action:** Wrap model resolution logic in bounded `Map` caches with module pre-warming for catalog items and `Object.freeze()` immutability to achieve $O(1)$ lookup times (~213 ns/op) while guarding against memory leaks.

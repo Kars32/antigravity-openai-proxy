@@ -194,6 +194,18 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Module-level singleton for Indian Standard Time formatter
+const IST_DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true
+});
+
+// Performance optimization: Bounded Map memoization cache for O(1) OpenCode model resolution
+const OPENCODE_RESOLUTION_CACHE = new Map<string, ResolvedOpenCodeModel | null>();
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
@@ -201,10 +213,16 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
   clean = clean.replace(/^(models\/|opencode\/)/, '');
 
-  // Exclude non-working or delisted models explicitly
-  if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {
-    return null;
+  const cached = OPENCODE_RESOLUTION_CACHE.get(clean);
+  if (cached !== undefined) {
+    return cached;
   }
+
+  const resolveInternal = (): ResolvedOpenCodeModel | null => {
+    // Exclude non-working or delisted models explicitly
+    if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {
+      return null;
+    }
 
   // Exact ID match from catalog
   const exact = OPENCODE_MODELS.find(m => m.id === clean);
@@ -290,6 +308,24 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
   if (nemotronLightningMatch) return nemotronLightningMatch;
 
   return null;
+  };
+
+  const res = resolveInternal();
+  const frozen = res ? Object.freeze(res) : null;
+  // Bound cache size to 1000 entries to prevent memory growth
+  if (OPENCODE_RESOLUTION_CACHE.size < 1000) {
+    OPENCODE_RESOLUTION_CACHE.set(clean, frozen);
+  }
+  return frozen;
+}
+
+// Pre-warm OpenCode resolution cache for all catalog models
+for (const om of OPENCODE_MODELS) {
+  OPENCODE_RESOLUTION_CACHE.set(om.id, Object.freeze({
+    wireModel: om.wireModel,
+    isFast: om.isFast ?? false,
+    canonicalId: om.id,
+  }));
 }
 
 export interface ExecuteOpenCodeOptions {
@@ -311,13 +347,7 @@ export async function executeOpenCodeCompletion({
 
   if (availableAccounts.length === 0) {
     const minCooldownSec = Math.min(...OPENCODE_GUEST_ACCOUNTS.map(a => Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))));
-    const refreshTimeStr = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    }).format(new Date(now + minCooldownSec * 1000)) + ' IST';
+    const refreshTimeStr = IST_DATE_FORMATTER.format(new Date(now + minCooldownSec * 1000)) + ' IST';
 
     const accountBreakdown = OPENCODE_GUEST_ACCOUNTS.map(a => `${a.name}: Cooldown (${Math.max(1, Math.ceil((a.cooldownUntil - now) / 1000))}s)`).join(' | ');
 

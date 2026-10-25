@@ -235,15 +235,25 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Performance optimization: Bounded Map memoization cache for O(1) model resolution
+// Prevents repeated array scans (.find) and conditional string checks on hot request paths.
+const MODEL_RESOLUTION_CACHE = new Map<string, { wireModel: string; defaultThinkingBudget: number } | null>();
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
-  if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+  const cached = MODEL_RESOLUTION_CACHE.get(clean);
+  if (cached !== undefined) {
+    return cached;
   }
+
+  const resolveInternal = (): { wireModel: string; defaultThinkingBudget: number } | null => {
+    // Exact ID match
+    const exact = SUPPORTED_MODELS.find(m => m.id === clean);
+    if (exact) {
+      return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+    }
 
   // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
   if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
@@ -322,10 +332,24 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 2048 };
   }
 
-  // Google internal wire format pass-through
-  if (clean.startsWith('publishers/google/models/') || clean.startsWith('models/')) {
-    return { wireModel: clean, defaultThinkingBudget: 8192 };
-  }
+    // Google internal wire format pass-through
+    if (clean.startsWith('publishers/google/models/') || clean.startsWith('models/')) {
+      return { wireModel: clean, defaultThinkingBudget: 8192 };
+    }
 
-  return null;
+    return null;
+  };
+
+  const res = resolveInternal();
+  const frozen = res ? Object.freeze(res) : null;
+  // Bound cache size to 1000 entries to prevent memory growth under random model key attacks
+  if (MODEL_RESOLUTION_CACHE.size < 1000) {
+    MODEL_RESOLUTION_CACHE.set(clean, frozen);
+  }
+  return frozen;
+}
+
+// Pre-warm resolution cache for all catalog models
+for (const m of SUPPORTED_MODELS) {
+  MODEL_RESOLUTION_CACHE.set(m.id, Object.freeze({ wireModel: m.wireModel, defaultThinkingBudget: m.defaultThinkingBudget }));
 }

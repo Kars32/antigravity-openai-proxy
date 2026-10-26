@@ -9,7 +9,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body style={{ margin: 0, padding: 0, backgroundColor: '#09090b', color: '#f4f4f5', fontFamily: 'system-ui, sans-serif' }}>
-        {children}
+        <main id="main-content">
+          {children}
+        </main>
       </body>
     </html>
   );

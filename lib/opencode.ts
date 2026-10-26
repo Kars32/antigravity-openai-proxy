@@ -145,6 +145,9 @@ export const OPENCODE_MODELS: OpenCodeModelSpec[] = [
   },
 ];
 
+// O(1) Set lookup for OpenCode model ID checks
+export const OPENCODE_MODEL_ID_SET = new Set(OPENCODE_MODELS.map(m => m.id));
+
 // 16 persistent guest sessions with valid RFC4122 v4 UUIDs
 export const OPENCODE_GUEST_ACCOUNTS: OpenCodeGuestAccount[] = [
   { id: 'opencode-guest-1', name: 'OpenCode Guest 1', sessionId: '3303e814-8561-4baf-a01a-a97a8431e672', cooldownUntil: 0, failCount: 0, successCount: 0 },
@@ -194,7 +197,11 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
-export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
+const MAX_OPENCODE_CACHE_SIZE = 500;
+// Bounded Map memoization cache for OpenCode model resolution
+const openCodeResolutionCache = new Map<string, ResolvedOpenCodeModel | null>();
+
+function computeResolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
   let clean = modelId.trim().toLowerCase();
 
@@ -290,6 +297,22 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
   if (nemotronLightningMatch) return nemotronLightningMatch;
 
   return null;
+}
+
+export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
+  if (!modelId || !modelId.trim()) return null;
+  const clean = modelId.trim().toLowerCase();
+
+  const cached = openCodeResolutionCache.get(clean);
+  if (cached !== undefined) return cached;
+
+  const result = computeResolveOpenCodeModel(modelId);
+
+  if (openCodeResolutionCache.size >= MAX_OPENCODE_CACHE_SIZE) {
+    openCodeResolutionCache.clear();
+  }
+  openCodeResolutionCache.set(clean, result);
+  return result;
 }
 
 export interface ExecuteOpenCodeOptions {

@@ -194,102 +194,56 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Static pre-computed lookup map for OpenCode model IDs and common variant aliases
+const OPENCODE_EXACT_MAP = new Map<string, ResolvedOpenCodeModel>();
+
+const REGISTER_OPENCODE_VARIANT = (
+  baseNames: string[],
+  wireModel: string,
+  canonicalBase: string
+) => {
+  const fastSuffixes = ['fast', 'off', 'nothink', 'no-think', 'no_think', 'zero'];
+  const thinkingSuffixes = ['thinking', 'think', 'thought', 'deep'];
+
+  for (const base of baseNames) {
+    OPENCODE_EXACT_MAP.set(base, { wireModel, isFast: false, canonicalId: canonicalBase });
+    for (const sep of ['-', ':']) {
+      for (const suffix of fastSuffixes) {
+        OPENCODE_EXACT_MAP.set(`${base}${sep}${suffix}`, { wireModel, isFast: true, canonicalId: `${canonicalBase}-fast` });
+      }
+      for (const suffix of thinkingSuffixes) {
+        OPENCODE_EXACT_MAP.set(`${base}${sep}${suffix}`, { wireModel, isFast: false, canonicalId: canonicalBase });
+      }
+    }
+  }
+};
+
+// Populate static variants for OpenCode models
+REGISTER_OPENCODE_VARIANT(['big-pickle'], 'big-pickle', 'big-pickle');
+REGISTER_OPENCODE_VARIANT(['mimo-v2.5-free', 'mimo-v2.5', 'mimo-2.5-free', 'mimo-2.5'], 'mimo-v2.5-free', 'mimo-v2.5-free');
+REGISTER_OPENCODE_VARIANT(['ling-3.0-flash-fin-free', 'ling-3.0-flash-free', 'ling-3.0-flash-fin', 'ling-3.0-flash'], 'ling-3.0-flash-fin-free', 'ling-3.0-flash-fin-free');
+REGISTER_OPENCODE_VARIANT(['nemotron-3-ultra-free', 'nemotron-3-ultra', 'nemotron-ultra-free', 'nemotron-ultra'], 'nemotron-3-ultra-free', 'nemotron-3-ultra-free');
+REGISTER_OPENCODE_VARIANT(['nemotron-3.5-lightning-free', 'nemotron-3.5-lightning', 'nemotron-lightning-free', 'nemotron-lightning'], 'nemotron-3.5-lightning-free', 'nemotron-3.5-lightning-free');
+
+// Ensure exact catalog entries take priority
+for (const m of OPENCODE_MODELS) {
+  OPENCODE_EXACT_MAP.set(m.id, { wireModel: m.wireModel, isFast: m.isFast, canonicalId: m.id });
+}
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
-  let clean = modelId.trim().toLowerCase();
+  const rawClean = modelId.trim().toLowerCase();
 
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
-  clean = clean.replace(/^(models\/|opencode\/)/, '');
+  const clean = rawClean.replace(/^(models\/|opencode\/)/, '');
 
   // Exclude non-working or delisted models explicitly
   if (clean.includes('deepseek-v4-flash') || clean.includes('muse-spark')) {
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
-  if (exact) {
-    return {
-      wireModel: exact.wireModel,
-      isFast: exact.isFast,
-      canonicalId: exact.id,
-    };
-  }
-
-  // Helper to detect fast/no-think suffix variant
-  const isFastSuffix = (suffix: string) => {
-    return /^(fast|off|no-?think|no_think|zero)$/i.test(suffix);
-  };
-
-  // Helper to detect thinking suffix
-  const isThinkingSuffix = (suffix: string) => {
-    return /^(thinking|think|thought|deep)$/i.test(suffix);
-  };
-
-  // Helper to match a base model and its separator
-  const matchModelVariant = (
-    baseNames: string[],
-    wireModel: string,
-    canonicalBase: string
-  ): ResolvedOpenCodeModel | null => {
-    for (const base of baseNames) {
-      if (clean === base) {
-        return { wireModel, isFast: false, canonicalId: canonicalBase };
-      }
-      if (clean.startsWith(base + '-') || clean.startsWith(base + ':')) {
-        const suffix = clean.slice(base.length + 1);
-        if (isFastSuffix(suffix)) {
-          return { wireModel, isFast: true, canonicalId: `${canonicalBase}-fast` };
-        }
-        if (isThinkingSuffix(suffix)) {
-          return { wireModel, isFast: false, canonicalId: canonicalBase };
-        }
-      }
-    }
-    return null;
-  };
-
-  // 1. Big Pickle
-  const bigPickleMatch = matchModelVariant(
-    ['big-pickle'],
-    'big-pickle',
-    'big-pickle'
-  );
-  if (bigPickleMatch) return bigPickleMatch;
-
-  // 2. Xiaomi MiMo v2.5 Free
-  const mimoMatch = matchModelVariant(
-    ['mimo-v2.5-free', 'mimo-v2.5', 'mimo-2.5-free', 'mimo-2.5'],
-    'mimo-v2.5-free',
-    'mimo-v2.5-free'
-  );
-  if (mimoMatch) return mimoMatch;
-
-  // 3. Ling 3.0 Flash Free
-  const lingMatch = matchModelVariant(
-    ['ling-3.0-flash-fin-free', 'ling-3.0-flash-free', 'ling-3.0-flash-fin', 'ling-3.0-flash'],
-    'ling-3.0-flash-fin-free',
-    'ling-3.0-flash-fin-free'
-  );
-  if (lingMatch) return lingMatch;
-
-  // 4. NVIDIA Nemotron 3 Ultra Free
-  const nemotronUltraMatch = matchModelVariant(
-    ['nemotron-3-ultra-free', 'nemotron-3-ultra', 'nemotron-ultra-free', 'nemotron-ultra'],
-    'nemotron-3-ultra-free',
-    'nemotron-3-ultra-free'
-  );
-  if (nemotronUltraMatch) return nemotronUltraMatch;
-
-  // 5. NVIDIA Nemotron 3.5 Lightning Free
-  const nemotronLightningMatch = matchModelVariant(
-    ['nemotron-3.5-lightning-free', 'nemotron-3.5-lightning', 'nemotron-lightning-free', 'nemotron-lightning'],
-    'nemotron-3.5-lightning-free',
-    'nemotron-3.5-lightning-free'
-  );
-  if (nemotronLightningMatch) return nemotronLightningMatch;
-
-  return null;
+  // O(1) Static Map lookup
+  return OPENCODE_EXACT_MAP.get(clean) || null;
 }
 
 export interface ExecuteOpenCodeOptions {

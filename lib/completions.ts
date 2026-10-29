@@ -229,8 +229,9 @@ export async function handleChatCompletions(req: NextRequest) {
                     try {
                       const parsed = JSON.parse(line.slice(6));
                       const cand = parsed.response?.candidates?.[0];
-                      if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
-                        recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+                      const gm = cand?.groundingMetadata || parsed.response?.groundingMetadata || parsed?.groundingMetadata;
+                      if (gm) {
+                        recordGroundingMetadata(gm, groundingCollector);
                       }
                       const parts = cand?.content?.parts || [];
 
@@ -270,7 +271,7 @@ export async function handleChatCompletions(req: NextRequest) {
                                   {
                                     index: 0,
                                     delta: { content: part.text },
-                                    finish_reason: cand.finishReason || null,
+                                    finish_reason: null,
                                   },
                                 ],
                               })}\n\n`
@@ -329,8 +330,9 @@ export async function handleChatCompletions(req: NextRequest) {
                     try {
                       const parsed = JSON.parse(line.slice(6));
                       const cand = parsed.response?.candidates?.[0];
-                      if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
-                        recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+                      const gm = cand?.groundingMetadata || parsed.response?.groundingMetadata || parsed?.groundingMetadata;
+                      if (gm) {
+                        recordGroundingMetadata(gm, groundingCollector);
                       }
                     } catch {}
                   }
@@ -407,8 +409,9 @@ export async function handleChatCompletions(req: NextRequest) {
           try {
             const parsed = JSON.parse(line.slice(6));
             const cand = parsed.response?.candidates?.[0];
-            if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
-              recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+            const gm = cand?.groundingMetadata || parsed.response?.groundingMetadata || parsed?.groundingMetadata;
+            if (gm) {
+              recordGroundingMetadata(gm, groundingCollector);
             }
             const parts = cand?.content?.parts || [];
             for (const part of parts) {
@@ -439,7 +442,8 @@ export async function handleChatCompletions(req: NextRequest) {
 
       const sourcesMarkdown = formatGroundingMarkdown(groundingCollector);
       if (sourcesMarkdown && !contentText.includes(sourcesMarkdown.trim())) {
-        contentText += sourcesMarkdown;
+        const trimmed = contentText.trimEnd();
+        contentText = trimmed ? `${trimmed}\n\n${sourcesMarkdown.trimStart()}` : sourcesMarkdown.trimStart();
       }
 
       const message: any = {

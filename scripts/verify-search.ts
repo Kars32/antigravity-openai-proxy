@@ -126,21 +126,23 @@ async function main() {
   const collector = createGroundingCollector();
   recordGroundingMetadata(
     {
-      webSearchQueries: ['world news today'],
+      webSearchQueries: ['world news today\nwith newline'],
       groundingChunks: [
         { web: { uri: 'https://news.bbc.co.uk/sample', title: 'BBC News' } },
-        { web: { uri: 'https://reuters.com/sample', title: 'Reuters' } },
+        { web: { uri: 'https://reuters.com/sample', title: 'Reuters\nHeadlines' } },
         { web: { uri: 'https://news.bbc.co.uk/sample', title: 'BBC News Duplicate' } },
+        { web: { uri: 'https://news.bbc.co.uk/other-article', title: 'BBC News' } },
       ]
     },
     collector
   );
-  assert.strictEqual(collector.sources.length, 2, 'Duplicate URLs must be deduplicated');
+  assert.strictEqual(collector.sources.length, 3, 'Duplicate URLs must be deduplicated');
   const formatted = formatGroundingMarkdown(collector);
   assert.ok(formatted.includes('### Sources:'), 'Must include Sources header');
-  assert.ok(formatted.includes('- [BBC News](https://news.bbc.co.uk/sample)'), 'Must format BBC source');
-  assert.ok(formatted.includes('- [Reuters](https://reuters.com/sample)'), 'Must format Reuters source');
-  console.log('✅ Grounding metadata deduplication and markdown formatting verified.\n');
+  assert.ok(formatted.includes('- [BBC News (1)](https://news.bbc.co.uk/sample)'), 'Repeated title must be disambiguated');
+  assert.ok(formatted.includes('- [BBC News (2)](https://news.bbc.co.uk/other-article)'), 'Repeated title must be disambiguated');
+  assert.ok(formatted.includes('- [Reuters Headlines](https://reuters.com/sample)'), 'Newlines in titles must be flattened');
+  console.log('✅ Grounding metadata deduplication, title disambiguation, and markdown formatting verified.\n');
 
   // Test 6: End-to-End Live Upstream Grounding Call to Google CloudCode PA
   console.log('Test 6: Live Upstream Verification with gemini-3.8-flash-search');

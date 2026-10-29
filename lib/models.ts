@@ -223,6 +223,68 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     speed: "Fast",
     contextWindow: 1048576,
   },
+
+  // 6. Native Google Search Grounding Models
+  {
+    id: "gemini-3.8-flash-search",
+    name: "Gemini 3.8 Flash (Search)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Gemini 3.8 Flash flagship model with native Google Search grounding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-web",
+    name: "Gemini 3.8 Flash (Web)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Gemini 3.8 Flash with native web search grounding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.7-flash-search",
+    name: "Gemini 3.7 Flash (Search)",
+    wireModel: "gemini-3.7-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Gemini 3.7 Flash flagship model with native Google Search grounding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.7-flash-web",
+    name: "Gemini 3.7 Flash (Web)",
+    wireModel: "gemini-3.7-flash-tiered",
+    defaultThinkingBudget: 8192,
+    description: "Gemini 3.7 Flash with native web search grounding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.1-pro-search",
+    name: "Gemini 3.1 Pro (Search)",
+    wireModel: "gemini-pro-agent",
+    defaultThinkingBudget: 32768,
+    description: "Gemini 3.1 Pro deep agent model with native Google Search grounding.",
+    tier: "Search",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.1-pro-web",
+    name: "Gemini 3.1 Pro (Web)",
+    wireModel: "gemini-pro-agent",
+    defaultThinkingBudget: 32768,
+    description: "Gemini 3.1 Pro deep agent model with native web search grounding.",
+    tier: "Search",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
   ...OPENCODE_MODELS.map(m => ({
     id: m.id,
     name: m.name,
@@ -235,14 +297,47 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
-export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number } | null {
+export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
   if (!modelId) return null;
   const clean = modelId.trim().toLowerCase();
+
+  // Search suffix detection (:search, -search, :web, -web)
+  let isWebSearch = false;
+  let baseClean = clean;
+  if (baseClean.endsWith(':search')) {
+    isWebSearch = true;
+    baseClean = baseClean.slice(0, -7);
+  } else if (baseClean.endsWith('-search')) {
+    isWebSearch = true;
+    baseClean = baseClean.slice(0, -7);
+  } else if (baseClean.endsWith(':web')) {
+    isWebSearch = true;
+    baseClean = baseClean.slice(0, -4);
+  } else if (baseClean.endsWith('-web')) {
+    isWebSearch = true;
+    baseClean = baseClean.slice(0, -4);
+  }
 
   // Exact ID match
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {
-    return { wireModel: exact.wireModel, defaultThinkingBudget: exact.defaultThinkingBudget };
+    const isSearchModel = clean.endsWith('-search') || clean.endsWith('-web') || isWebSearch;
+    return {
+      wireModel: exact.wireModel,
+      defaultThinkingBudget: exact.defaultThinkingBudget,
+      isWebSearch: isSearchModel ? true : undefined,
+    };
+  }
+
+  // If search suffix was stripped, resolve the base model with isWebSearch: true
+  if (isWebSearch && baseClean) {
+    const baseResolved = resolveModel(baseClean);
+    if (baseResolved) {
+      return {
+        ...baseResolved,
+        isWebSearch: true,
+      };
+    }
   }
 
   // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)

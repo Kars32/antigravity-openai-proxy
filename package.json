@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "tsc scripts/verify-search.ts --module commonjs --target es2022 --skipLibCheck --moduleResolution node --esModuleInterop --noEmit false && node scripts/verify-search.js"
   },
   "dependencies": {
     "next": "^15.1.7",

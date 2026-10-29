@@ -8,6 +8,11 @@ import {
 } from './antigravity';
 import { resolveModel } from './models';
 import { resolveOpenCodeModel, executeOpenCodeCompletion } from './opencode';
+import {
+  createGroundingCollector,
+  recordGroundingMetadata,
+  formatGroundingMarkdown
+} from './tools';
 
 const UPSTREAM_URLS = [
   'https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse',
@@ -60,7 +65,7 @@ export async function handleChatCompletions(req: NextRequest) {
     return NextResponse.json(
       {
         error: {
-          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.8-flash, gemini-3.7-flash, gemini-3.1-pro, big-pickle, big-pickle-fast, mimo-v2.5-free, mimo-v2.5-free-fast, ling-3.0-flash-fin-free, ling-3.0-flash-fin-free-fast, nemotron-3-ultra-free, nemotron-3-ultra-free-fast, nemotron-3.5-lightning-free, nemotron-3.5-lightning-free-fast.`,
+          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.8-flash, gemini-3.8-flash-search, gemini-3.7-flash, gemini-3.7-flash-search, gemini-3.1-pro, gemini-3.1-pro-search, big-pickle, big-pickle-fast, mimo-v2.5-free, mimo-v2.5-free-fast, ling-3.0-flash-fin-free, ling-3.0-flash-fin-free-fast, nemotron-3-ultra-free, nemotron-3-ultra-free-fast, nemotron-3.5-lightning-free, nemotron-3.5-lightning-free-fast.`,
           type: 'invalid_request_error',
           param: 'model',
           code: 'model_not_found',
@@ -199,6 +204,7 @@ export async function handleChatCompletions(req: NextRequest) {
         const decoder = new TextDecoder();
         const chatcmplId = `chatcmpl-${crypto.randomUUID().slice(0, 8)}`;
         let toolCallIndex = 0;
+        const groundingCollector = createGroundingCollector();
 
         const customStream = new ReadableStream({
           async start(controller) {
@@ -223,6 +229,9 @@ export async function handleChatCompletions(req: NextRequest) {
                     try {
                       const parsed = JSON.parse(line.slice(6));
                       const cand = parsed.response?.candidates?.[0];
+                      if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
+                        recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+                      }
                       const parts = cand?.content?.parts || [];
 
                       for (const part of parts) {
@@ -311,6 +320,44 @@ export async function handleChatCompletions(req: NextRequest) {
                 }
               }
 
+              // Drain any remaining buffer
+              buffer += decoder.decode();
+              if (buffer.trim()) {
+                const remainingLines = buffer.split('\n');
+                for (const line of remainingLines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const parsed = JSON.parse(line.slice(6));
+                      const cand = parsed.response?.candidates?.[0];
+                      if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
+                        recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+                      }
+                    } catch {}
+                  }
+                }
+              }
+
+              const sourcesMarkdown = formatGroundingMarkdown(groundingCollector);
+              if (sourcesMarkdown) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      id: chatcmplId,
+                      object: 'chat.completion.chunk',
+                      created: Math.floor(Date.now() / 1000),
+                      model: modelId,
+                      choices: [
+                        {
+                          index: 0,
+                          delta: { content: sourcesMarkdown },
+                          finish_reason: null,
+                        },
+                      ],
+                    })}\n\n`
+                  )
+                );
+              }
+
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
@@ -352,6 +399,7 @@ export async function handleChatCompletions(req: NextRequest) {
       let contentText = '';
       let thoughtText = '';
       const toolCalls: any[] = [];
+      const groundingCollector = createGroundingCollector();
 
       const lines = rawText.split('\n');
       for (const line of lines) {
@@ -359,6 +407,9 @@ export async function handleChatCompletions(req: NextRequest) {
           try {
             const parsed = JSON.parse(line.slice(6));
             const cand = parsed.response?.candidates?.[0];
+            if (cand?.groundingMetadata || parsed.response?.groundingMetadata) {
+              recordGroundingMetadata(cand?.groundingMetadata || parsed.response?.groundingMetadata, groundingCollector);
+            }
             const parts = cand?.content?.parts || [];
             for (const part of parts) {
               if (part.thought) {
@@ -384,6 +435,11 @@ export async function handleChatCompletions(req: NextRequest) {
             }
           } catch {}
         }
+      }
+
+      const sourcesMarkdown = formatGroundingMarkdown(groundingCollector);
+      if (sourcesMarkdown && !contentText.includes(sourcesMarkdown.trim())) {
+        contentText += sourcesMarkdown;
       }
 
       const message: any = {

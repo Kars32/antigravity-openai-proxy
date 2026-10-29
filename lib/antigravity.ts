@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { transformOpenAIToolsToGoogle, formatToolChoice } from './tools';
+import { transformOpenAIToolsToGoogle, formatToolChoice, isWebSearchRequested } from './tools';
 
 export interface AccountConfig {
   id: string;
@@ -174,7 +174,7 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
 
 export function transformOpenAIToAntigravity(
   body: any,
-  resolved: { wireModel: string; defaultThinkingBudget: number },
+  resolved: { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean },
   projectId: string
 ) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
@@ -372,12 +372,20 @@ export function transformOpenAIToAntigravity(
     };
   }
 
-  const googleTools = transformOpenAIToolsToGoogle(body.tools);
-  if (googleTools) {
+  const isWebSearch = isWebSearchRequested(body, body.model, resolved);
+  const googleTools = transformOpenAIToolsToGoogle(body.tools) || [];
+  if (isWebSearch) {
+    googleTools.push({ googleSearch: {} });
+  }
+
+  if (googleTools.length > 0) {
     reqObj.tools = googleTools;
-    const toolConfig = formatToolChoice(body.tool_choice);
-    if (toolConfig) {
-      reqObj.toolConfig = { functionCallingConfig: toolConfig };
+    const hasFunctionDecls = googleTools.some((t: any) => Array.isArray(t.functionDeclarations) && t.functionDeclarations.length > 0);
+    if (hasFunctionDecls) {
+      const toolConfig = formatToolChoice(body.tool_choice);
+      if (toolConfig) {
+        reqObj.toolConfig = { functionCallingConfig: toolConfig };
+      }
     }
   }
 

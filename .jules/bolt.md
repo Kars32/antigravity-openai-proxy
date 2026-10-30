@@ -15,3 +15,6 @@ Only add entries for surprising failures, codebase-specific anti-patterns, or cr
 **Learning:** Under high-concurrency traffic or container cold-starts, multiple concurrent requests finding an expired access token simultaneously dispatched duplicate OAuth token exchange requests to `oauth2.googleapis.com` and `loadCodeAssistMetadata`. This increased proxy latency by 300ms–800ms and risked Google OAuth rate limits.
 **Action:** Implement single-flight promise memoization on `getAccessToken` via an in-flight Promise map, ensuring all concurrent requests share a single refresh promise and resolve immediately once it settles.
 
+## 2026-10-04 - Model Catalog Resolution & Response Allocation Bottleneck
+**Learning:** In proxy hot paths (`/v1/chat/completions` and `/v1/models`), linear array scanning via `.find()` and O(N*M) nested array iteration (`OPENCODE_MODELS.some()`) during request routing caused unnecessary CPU overhead and runtime object allocations.
+**Action:** Use pre-built `Map` lookups, bounded memoization caches (max 500 entries) for deterministic model ID resolutions, and a pre-computed response object (`getModelListResponse()`) for static model catalog endpoints.

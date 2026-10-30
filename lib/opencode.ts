@@ -194,10 +194,35 @@ export interface ResolvedOpenCodeModel {
   canonicalId: string;
 }
 
+// Map for O(1) exact catalog lookups
+const OPENCODE_MODEL_MAP = new Map<string, OpenCodeModelSpec>(
+  OPENCODE_MODELS.map(m => [m.id, m])
+);
+
+// Bounded memoization cache for deterministic model resolutions
+const OPENCODE_RESOLVE_CACHE = new Map<string, ResolvedOpenCodeModel | null>();
+const MAX_RESOLVE_CACHE_SIZE = 500;
+
 export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | null {
   if (!modelId || !modelId.trim()) return null;
-  let clean = modelId.trim().toLowerCase();
+  const rawKey = modelId.trim().toLowerCase();
 
+  const cached = OPENCODE_RESOLVE_CACHE.get(rawKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = uncachedResolveOpenCodeModel(rawKey);
+
+  if (OPENCODE_RESOLVE_CACHE.size >= MAX_RESOLVE_CACHE_SIZE) {
+    OPENCODE_RESOLVE_CACHE.clear();
+  }
+  OPENCODE_RESOLVE_CACHE.set(rawKey, result);
+
+  return result;
+}
+
+function uncachedResolveOpenCodeModel(clean: string): ResolvedOpenCodeModel | null {
   // Strip common provider prefixes (e.g. opencode/big-pickle, models/mimo-v2.5-free)
   clean = clean.replace(/^(models\/|opencode\/)/, '');
 
@@ -206,8 +231,8 @@ export function resolveOpenCodeModel(modelId?: string): ResolvedOpenCodeModel | 
     return null;
   }
 
-  // Exact ID match from catalog
-  const exact = OPENCODE_MODELS.find(m => m.id === clean);
+  // Exact O(1) ID match from catalog
+  const exact = OPENCODE_MODEL_MAP.get(clean);
   if (exact) {
     return {
       wireModel: exact.wireModel,

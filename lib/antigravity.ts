@@ -447,19 +447,40 @@ export function transformOpenAIToAntigravity(
     safetySettings: UNRESTRICTED_SAFETY_SETTINGS,
   };
 
-  if (systemBlocks.length > 0) {
-    reqObj.systemInstruction = {
-      role: 'system',
-      parts: [{ text: systemBlocks.join('\n\n') }]
-    };
-  }
-
   const isWebSearch = isWebSearchRequested(body, body.model, resolved);
+  const isClaude = (resolved.wireModel || '').startsWith('claude-');
   const googleTools = transformOpenAIToolsToGoogle(body.tools) || [];
   const hasFunctionDecls = googleTools.some((t: any) => Array.isArray(t.functionDeclarations) && t.functionDeclarations.length > 0);
 
   if (isWebSearch) {
-    if (!hasFunctionDecls) {
+    if (isClaude) {
+      // Anthropic Claude on Vertex AI does not support Google's internal { googleSearch: {} } proto.
+      // Expose google_search as a function declaration so Claude actively invokes search.
+      let declGroup = googleTools.find((t: any) => Array.isArray(t.functionDeclarations));
+      if (!declGroup) {
+        declGroup = { functionDeclarations: [] };
+        googleTools.push(declGroup);
+      }
+      if (!declGroup.functionDeclarations.some((d: any) => d.name === 'google_search')) {
+        declGroup.functionDeclarations.push({
+          name: 'google_search',
+          description: 'Search Google and the live web for real-time information, current news, facts, people, sports scores, or external knowledge.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              query: {
+                type: 'STRING',
+                description: 'The search query to look up on Google.',
+              },
+            },
+            required: ['query'],
+          },
+        });
+      }
+      systemBlocks.push(
+        'You have access to live web search via the google_search tool. Whenever the user asks about current events, recent developments, breaking news, sports scores, live status, weather, dates, real-time facts, or queries requiring up-to-date information, you MUST call the google_search tool immediately rather than stating your knowledge is limited or outdated.'
+      );
+    } else if (!hasFunctionDecls) {
       googleTools.push({ googleSearch: {} });
     } else {
       // Upstream Daily CloudCode PA rejects built-in { googleSearch: {} } when combined with functionDeclarations.
@@ -482,6 +503,13 @@ export function transformOpenAIToAntigravity(
         });
       }
     }
+  }
+
+  if (systemBlocks.length > 0) {
+    reqObj.systemInstruction = {
+      role: 'system',
+      parts: [{ text: systemBlocks.join('\n\n') }]
+    };
   }
 
   if (googleTools.length > 0) {

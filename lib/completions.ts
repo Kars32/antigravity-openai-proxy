@@ -19,7 +19,12 @@ const UPSTREAM_URLS = [
   'https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse',
 ];
 
-async function executeSearchQueryInternal(query: string, accessToken: string, projectId: string): Promise<string> {
+interface SearchQueryResult {
+  summary: string;
+  sources: string;
+}
+
+async function executeSearchQueryInternal(query: string, accessToken: string, projectId: string): Promise<SearchQueryResult> {
   const envelope = {
     project: projectId,
     requestId: 'agent/' + Date.now() + '/search',
@@ -64,14 +69,14 @@ async function executeSearchQueryInternal(query: string, accessToken: string, pr
           }
         }
         const sources = formatGroundingMarkdown(collector);
-        if (sources && !summary.includes(sources.trim())) {
-          summary += `\n\n${sources}`;
-        }
-        return summary.trim();
+        return {
+          summary: summary.trim(),
+          sources: (sources || '').trim(),
+        };
       }
     } catch {}
   }
-  return '';
+  return { summary: '', sources: '' };
 }
 
 export function checkAuth(req: NextRequest): boolean {
@@ -255,11 +260,13 @@ export async function handleChatCompletions(req: NextRequest) {
 
       // 1. Streaming Response
       if (stream) {
+        const clientHasGoogleSearch = Array.isArray(body.tools) && body.tools.some((t: any) => t?.function?.name === 'google_search');
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
         const chatcmplId = `chatcmpl-${crypto.randomUUID().slice(0, 8)}`;
         let toolCallIndex = 0;
         const groundingCollector = createGroundingCollector();
+        const internalSearchCalls: any[] = [];
 
         const customStream = new ReadableStream({
           async start(controller) {
@@ -335,6 +342,15 @@ export async function handleChatCompletions(req: NextRequest) {
                         }
 
                         if (part.functionCall) {
+                          if (part.functionCall.name === 'google_search' && !clientHasGoogleSearch) {
+                            internalSearchCalls.push({
+                              id: part.functionCall.id || `call_${crypto.randomUUID().slice(0, 8)}`,
+                              name: part.functionCall.name,
+                              args: part.functionCall.args || {},
+                            });
+                            continue;
+                          }
+
                           const callId = part.functionCall.id || `call_${crypto.randomUUID().slice(0, 8)}`;
                           const toolCallObj: any = {
                             index: toolCallIndex++,
@@ -394,8 +410,153 @@ export async function handleChatCompletions(req: NextRequest) {
                 }
               }
 
+              // If internal google_search was invoked, execute searches and stream the grounded answer
+              let searchSourcesMarkdown = '';
+              if (internalSearchCalls.length > 0) {
+                const searchResults = await Promise.all(
+                  internalSearchCalls.map(async (sc) => {
+                    let searchQuery = '';
+                    try {
+                      searchQuery = sc.args.query || sc.args.q || '';
+                    } catch {
+                      searchQuery = typeof sc.args === 'string' ? sc.args : '';
+                    }
+                    const res = searchQuery.trim()
+                      ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId)
+                      : { summary: '', sources: '' };
+                    return {
+                      id: sc.id,
+                      query: searchQuery.trim(),
+                      summary: res.summary || 'No specific search results found.',
+                      sources: res.sources || '',
+                    };
+                  })
+                );
+
+                const subContents = [...(envelope.request.contents || [])];
+                subContents.push({
+                  role: 'model',
+                  parts: internalSearchCalls.map(sc => ({
+                    functionCall: {
+                      name: 'google_search',
+                      args: sc.args,
+                      id: sc.id,
+                    }
+                  }))
+                });
+                subContents.push({
+                  role: 'user',
+                  parts: searchResults.map(sr => ({
+                    functionResponse: {
+                      name: 'google_search',
+                      response: { result: sr.summary + (sr.sources ? '\n\n' + sr.sources : '') },
+                      id: sr.id,
+                    }
+                  }))
+                });
+
+                const subEnvelope = {
+                  ...envelope,
+                  requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
+                  request: {
+                    ...envelope.request,
+                    contents: subContents,
+                  }
+                };
+
+                let secondStreamRes: Response | null = null;
+                for (const upstreamUrl of UPSTREAM_URLS) {
+                  try {
+                    const sRes = await fetch(upstreamUrl, {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                        Accept: 'text/event-stream',
+                        'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
+                      },
+                      body: JSON.stringify(subEnvelope),
+                    });
+                    if (sRes.ok) {
+                      secondStreamRes = sRes;
+                      break;
+                    }
+                  } catch {}
+                }
+
+                if (secondStreamRes && secondStreamRes.body) {
+                  const sReader = secondStreamRes.body.getReader();
+                  let sBuffer = '';
+                  while (true) {
+                    const { done, value } = await sReader.read();
+                    if (done) break;
+                    sBuffer += decoder.decode(value, { stream: true });
+                    const sLines = sBuffer.split('\n');
+                    sBuffer = sLines.pop() || '';
+                    for (const line of sLines) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          const parsed = JSON.parse(line.slice(6));
+                          const cand = parsed.response?.candidates?.[0];
+                          const gm = cand?.groundingMetadata || parsed.response?.groundingMetadata;
+                          if (gm) {
+                            recordGroundingMetadata(gm, groundingCollector);
+                          }
+                          for (const part of cand?.content?.parts || []) {
+                            if (part.thought) {
+                              const text = part.text || '';
+                              if (text) {
+                                controller.enqueue(
+                                  encoder.encode(
+                                    `data: ${JSON.stringify({
+                                      id: chatcmplId,
+                                      object: 'chat.completion.chunk',
+                                      created: Math.floor(Date.now() / 1000),
+                                      model: modelId,
+                                      choices: [{ index: 0, delta: { reasoning_content: text }, finish_reason: null }],
+                                    })}\n\n`
+                                  )
+                                );
+                              }
+                            }
+                            if (part.text && !part.thought) {
+                              controller.enqueue(
+                                encoder.encode(
+                                  `data: ${JSON.stringify({
+                                    id: chatcmplId,
+                                    object: 'chat.completion.chunk',
+                                    created: Math.floor(Date.now() / 1000),
+                                    model: modelId,
+                                    choices: [{ index: 0, delta: { content: part.text }, finish_reason: null }],
+                                  })}\n\n`
+                                )
+                              );
+                            }
+                          }
+                        } catch {}
+                      }
+                    }
+                  }
+                }
+
+                searchSourcesMarkdown = searchResults.map(sr => sr.sources).filter(Boolean).join('\n');
+                if (searchSourcesMarkdown) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        id: chatcmplId,
+                        object: 'chat.completion.chunk',
+                        created: Math.floor(Date.now() / 1000),
+                        model: modelId,
+                        choices: [{ index: 0, delta: { content: '\n\n' + searchSourcesMarkdown.trimStart() }, finish_reason: null }],
+                      })}\n\n`
+                    )
+                  );
+                }
+              }
+
               const sourcesMarkdown = formatGroundingMarkdown(groundingCollector);
-              if (sourcesMarkdown) {
+              if (sourcesMarkdown && (!searchSourcesMarkdown || !searchSourcesMarkdown.includes(sourcesMarkdown.trim()))) {
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
@@ -455,7 +616,7 @@ export async function handleChatCompletions(req: NextRequest) {
       const rawText = await upstreamRes.text();
       let contentText = '';
       let thoughtText = '';
-      const toolCalls: any[] = [];
+      let toolCalls: any[] = [];
       const groundingCollector = createGroundingCollector();
 
       const lines = rawText.split('\n');
@@ -502,120 +663,138 @@ export async function handleChatCompletions(req: NextRequest) {
         contentText = trimmed ? `${trimmed}\n\n${sourcesMarkdown.trimStart()}` : sourcesMarkdown.trimStart();
       }
 
-      // Automatically execute google_search if called alongside client tools
-      const searchCall = toolCalls.find(tc => tc.function?.name === 'google_search');
-      if (searchCall) {
-        let searchQuery = '';
+      // Automatically execute google_search if called alongside client tools or by Claude
+      const clientHasGoogleSearch = Array.isArray(body.tools) && body.tools.some((t: any) => t?.function?.name === 'google_search');
+      const searchCalls = !clientHasGoogleSearch ? toolCalls.filter(tc => tc.function?.name === 'google_search') : [];
+      if (searchCalls.length > 0) {
         try {
-          const parsed = JSON.parse(searchCall.function.arguments);
-          searchQuery = parsed.query || parsed.q || '';
-        } catch {
-          searchQuery = searchCall.function.arguments || '';
-        }
-
-        if (searchQuery.trim()) {
-          try {
-            const searchSummary = await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId);
-            if (searchSummary) {
-              if (toolCalls.length === 1) {
-                // google_search was the sole tool call: complete the loop and return grounded answer directly!
-                const searchCallId = `call_${crypto.randomUUID().slice(0, 8)}`;
-                const subContents = [...(envelope.request.contents || [])];
-                subContents.push({
-                  role: 'model',
-                  parts: [{
-                    functionCall: {
-                      name: 'google_search',
-                      args: { query: searchQuery.trim() },
-                      id: searchCallId,
-                    }
-                  }]
-                });
-                subContents.push({
-                  role: 'user',
-                  parts: [{
-                    functionResponse: {
-                      name: 'google_search',
-                      response: { result: searchSummary },
-                      id: searchCallId,
-                    }
-                  }]
-                });
-
-                const subEnvelope = {
-                  ...envelope,
-                  requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
-                  request: {
-                    ...envelope.request,
-                    contents: subContents,
-                  }
-                };
-
-                for (const upstreamUrl of UPSTREAM_URLS) {
-                  try {
-                    const subRes = await fetch(upstreamUrl, {
-                      method: 'POST',
-                      headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                        Accept: 'text/event-stream',
-                        'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
-                      },
-                      body: JSON.stringify(subEnvelope),
-                    });
-
-                    if (subRes.ok) {
-                      const subText = await subRes.text();
-                      let finalContent = '';
-                      let finalThought = '';
-                      const finalToolCalls: any[] = [];
-                      for (const l of subText.split('\n')) {
-                        if (l.startsWith('data: ')) {
-                          try {
-                            const p = JSON.parse(l.slice(6));
-                            const cand = p.response?.candidates?.[0];
-                            for (const part of cand?.content?.parts || []) {
-                              if (part.thought) finalThought += part.text || '';
-                              else if (part.text) finalContent += part.text;
-                              if (part.functionCall) {
-                                finalToolCalls.push({
-                                  id: `call_${crypto.randomUUID().slice(0, 8)}`,
-                                  type: 'function',
-                                  function: {
-                                    name: part.functionCall.name,
-                                    arguments: JSON.stringify(part.functionCall.args || {}),
-                                  }
-                                });
-                              }
-                            }
-                          } catch {}
-                        }
-                      }
-
-                      if (finalContent || finalToolCalls.length > 0) {
-                        const finalMsg: any = { role: 'assistant', content: finalContent || null };
-                        if (finalThought.trim()) finalMsg.reasoning_content = finalThought.trim();
-                        if (finalToolCalls.length > 0) finalMsg.tool_calls = finalToolCalls;
-                        return NextResponse.json({
-                          id: `chatcmpl-${crypto.randomUUID().slice(0, 8)}`,
-                          object: 'chat.completion',
-                          created: Math.floor(Date.now() / 1000),
-                          model: modelId,
-                          choices: [{
-                            index: 0,
-                            message: finalMsg,
-                            finish_reason: finalToolCalls.length > 0 ? 'tool_calls' : 'stop'
-                          }],
-                          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-                        }, { headers: { 'Access-Control-Allow-Origin': '*' } });
-                      }
-                    }
-                  } catch {}
-                }
+          const searchResults = await Promise.all(
+            searchCalls.map(async (sc) => {
+              let searchQuery = '';
+              try {
+                const parsed = JSON.parse(sc.function.arguments);
+                searchQuery = parsed.query || parsed.q || '';
+              } catch {
+                searchQuery = sc.function.arguments || '';
               }
+              const res = searchQuery.trim()
+                ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId)
+                : { summary: '', sources: '' };
+              return {
+                id: sc.id || `call_${crypto.randomUUID().slice(0, 8)}`,
+                query: searchQuery.trim(),
+                summary: res.summary || 'No specific search results found.',
+                sources: res.sources || '',
+              };
+            })
+          );
+
+          if (searchResults.some(sr => sr.summary)) {
+            const subContents = [...(envelope.request.contents || [])];
+            subContents.push({
+              role: 'model',
+              parts: searchResults.map(sr => ({
+                functionCall: {
+                  name: 'google_search',
+                  args: { query: sr.query },
+                  id: sr.id,
+                }
+              }))
+            });
+            subContents.push({
+              role: 'user',
+              parts: searchResults.map(sr => ({
+                functionResponse: {
+                  name: 'google_search',
+                  response: { result: sr.summary + (sr.sources ? '\n\n' + sr.sources : '') },
+                  id: sr.id,
+                }
+              }))
+            });
+
+            const subEnvelope = {
+              ...envelope,
+              requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
+              request: {
+                ...envelope.request,
+                contents: subContents,
+              }
+            };
+
+            for (const upstreamUrl of UPSTREAM_URLS) {
+              try {
+                const subRes = await fetch(upstreamUrl, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'text/event-stream',
+                    'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
+                  },
+                  body: JSON.stringify(subEnvelope),
+                });
+
+                if (subRes.ok) {
+                  const subText = await subRes.text();
+                  let finalContent = '';
+                  let finalThought = '';
+                  const finalToolCalls: any[] = [];
+                  for (const l of subText.split('\n')) {
+                    if (l.startsWith('data: ')) {
+                      try {
+                        const p = JSON.parse(l.slice(6));
+                        const cand = p.response?.candidates?.[0];
+                        for (const part of cand?.content?.parts || []) {
+                          if (part.thought) finalThought += part.text || '';
+                          else if (part.text) finalContent += part.text;
+                          if (part.functionCall) {
+                            finalToolCalls.push({
+                              id: part.functionCall.id || `call_${crypto.randomUUID().slice(0, 8)}`,
+                              type: 'function',
+                              function: {
+                                name: part.functionCall.name,
+                                arguments: JSON.stringify(part.functionCall.args || {}),
+                              }
+                            });
+                          }
+                        }
+                      } catch {}
+                    }
+                  }
+
+                  if (finalContent || finalToolCalls.length > 0) {
+                    const combinedSources = searchResults.map(sr => sr.sources).filter(Boolean).join('\n');
+                    if (combinedSources && !finalContent.includes('### Sources:')) {
+                      finalContent = finalContent.trimEnd() ? `${finalContent.trimEnd()}\n\n${combinedSources}` : combinedSources;
+                    }
+                    const combinedThought = [thoughtText.trim(), finalThought.trim()].filter(Boolean).join('\n\n');
+                    const finalMsg: any = { role: 'assistant', content: finalContent || null };
+                    if (combinedThought) finalMsg.reasoning_content = combinedThought;
+                    if (finalToolCalls.length > 0) finalMsg.tool_calls = finalToolCalls;
+                    return NextResponse.json({
+                      id: `chatcmpl-${crypto.randomUUID().slice(0, 8)}`,
+                      object: 'chat.completion',
+                      created: Math.floor(Date.now() / 1000),
+                      model: modelId,
+                      choices: [{
+                        index: 0,
+                        message: finalMsg,
+                        finish_reason: finalToolCalls.length > 0 ? 'tool_calls' : 'stop'
+                      }],
+                      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+                    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+                  }
+                }
+              } catch {}
             }
-          } catch {}
+          }
+        } catch (err) {
+          console.error('[Google Search Auto-Execution Error]:', err);
         }
+      }
+
+      if (!clientHasGoogleSearch && toolCalls.length > 0) {
+        toolCalls = toolCalls.filter(tc => tc.function?.name !== 'google_search');
       }
 
       const message: any = {

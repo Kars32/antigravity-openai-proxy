@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { transformOpenAIToAntigravity } from './lib/antigravity';
+import { transformOpenAIToAntigravity, parseDataUri } from './lib/antigravity';
 
 console.log('--- Testing transformOpenAIToAntigravity from lib/antigravity ---');
 
@@ -187,7 +187,85 @@ const res9 = transformOpenAIToAntigravity(
 assert.strictEqual(res9.request.contents[0].parts[0].text, 'Hello\nworld\nfrom test');
 console.log('✓ Test 9: Mixed array content extraction passed');
 
-// Test 10: Single-flight OAuth token deduplication
+// Test 10: Multimodal image data URI transformation
+const sample1x1Png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+// 10.1 parseDataUri helper tests
+const parsedPng = parseDataUri(sample1x1Png);
+assert.ok(parsedPng, 'parseDataUri should parse 1x1 png data URI');
+assert.strictEqual(parsedPng?.mimeType, 'image/png');
+assert.strictEqual(parsedPng?.data, 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+assert.strictEqual(parseDataUri('https://example.com/test.png'), null, 'Non-data URI should return null');
+assert.strictEqual(parseDataUri('data:invalid'), null, 'Invalid data URI should return null');
+
+// 10.2 Multimodal user message with text and image
+const res10Multimodal = transformOpenAIToAntigravity(
+  {
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is in this picture?' },
+          { type: 'image_url', image_url: { url: sample1x1Png } }
+        ]
+      }
+    ]
+  },
+  { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+  'test-proj'
+);
+assert.strictEqual(res10Multimodal.request.contents.length, 1);
+assert.strictEqual(res10Multimodal.request.contents[0].role, 'user');
+assert.strictEqual(res10Multimodal.request.contents[0].parts.length, 2);
+assert.strictEqual(res10Multimodal.request.contents[0].parts[0].text, 'What is in this picture?');
+assert.deepStrictEqual(res10Multimodal.request.contents[0].parts[1].inlineData, {
+  mimeType: 'image/png',
+  data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+});
+assert.deepStrictEqual(res10Multimodal.request.contents[0].parts[1].inline_data, {
+  mime_type: 'image/png',
+  data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+});
+
+// 10.3 Standalone image part (no text)
+const res10ImageOnly = transformOpenAIToAntigravity(
+  {
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: sample1x1Png } }
+        ]
+      }
+    ]
+  },
+  { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+  'test-proj'
+);
+assert.strictEqual(res10ImageOnly.request.contents.length, 1);
+assert.strictEqual(res10ImageOnly.request.contents[0].role, 'user');
+assert.strictEqual(res10ImageOnly.request.contents[0].parts.length, 1);
+assert.strictEqual(res10ImageOnly.request.contents[0].parts[0].inlineData.mimeType, 'image/png');
+
+// 10.4 String format image_url fallback
+const res10StringUrl = transformOpenAIToAntigravity(
+  {
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: sample1x1Png as any }
+        ]
+      }
+    ]
+  },
+  { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+  'test-proj'
+);
+assert.strictEqual(res10StringUrl.request.contents[0].parts[0].inlineData.mimeType, 'image/png');
+console.log('✓ Test 10: Multimodal image data URI transformation passed');
+
+// Test 11: Single-flight OAuth token deduplication
 async function runAsyncTests() {
   const { getAccessToken } = await import('./lib/antigravity');
   const originalFetch = global.fetch;
@@ -223,12 +301,12 @@ async function runAsyncTests() {
     assert.strictEqual(t2, 'test_dedup_token');
     assert.strictEqual(t3, 'test_dedup_token');
     assert.strictEqual(fetchCount, 1, 'Concurrent getAccessToken calls must share a single network fetch');
-    console.log('✓ Test 10: Single-flight OAuth token deduplication passed (3 concurrent calls -> 1 fetch)');
+    console.log('✓ Test 11: Single-flight OAuth token deduplication passed (3 concurrent calls -> 1 fetch)');
   } finally {
     global.fetch = originalFetch;
   }
 
-  console.log('\nAll 10 test suites passed successfully!');
+  console.log('\nAll 11 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

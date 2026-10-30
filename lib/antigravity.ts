@@ -172,6 +172,19 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
   return refreshPromise;
 }
 
+/**
+ * Parses a standard data URI (e.g. data:image/png;base64,iVBORw0KGgo...)
+ * extracting the clean MIME type and raw base64 data string.
+ */
+export function parseDataUri(uri: string): { mimeType: string; data: string } | null {
+  const match = uri.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/s);
+  if (!match) return null;
+  return {
+    mimeType: match[1],
+    data: match[2].trim(),
+  };
+}
+
 export function transformOpenAIToAntigravity(
   body: any,
   resolved: { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean },
@@ -293,15 +306,54 @@ export function transformOpenAIToAntigravity(
       continue;
     }
 
-    let text = '';
     if (typeof m.content === 'string') {
-      text = m.content;
+      if (m.content) {
+        parts.push({ text: m.content });
+      }
     } else if (Array.isArray(m.content)) {
-      text = m.content.map((p: any) => (typeof p === 'string' ? p : p?.text || '')).join('\n');
-    }
+      for (const part of m.content) {
+        if (!part) continue;
 
-    if (text) {
-      parts.push({ text });
+        // 1. Text part
+        let textVal: string | null = null;
+        if (typeof part === 'string') {
+          if (part.trim()) textVal = part;
+        } else if (part.type === 'text' && typeof part.text === 'string' && part.text) {
+          textVal = part.text;
+        }
+
+        if (textVal !== null) {
+          const lastPart = parts[parts.length - 1];
+          if (lastPart && typeof lastPart.text === 'string') {
+            lastPart.text = `${lastPart.text}\n${textVal}`;
+          } else {
+            parts.push({ text: textVal });
+          }
+          continue;
+        }
+
+        // 2. Multimodal image part
+        if (part.type === 'image_url' && part.image_url) {
+          const rawUrl = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url;
+          if (typeof rawUrl === 'string' && rawUrl.startsWith('data:')) {
+            const parsed = parseDataUri(rawUrl);
+            if (parsed) {
+              // Convert to Google CloudCode PA / Gemini wire format
+              parts.push({
+                inlineData: {
+                  mimeType: parsed.mimeType,
+                  data: parsed.data,
+                },
+                // Wire safety: include snake_case fallback for upstream proto variations
+                inline_data: {
+                  mime_type: parsed.mimeType,
+                  data: parsed.data,
+                },
+              });
+            }
+          }
+        }
+      }
     }
 
     if (parts.length > 0) {

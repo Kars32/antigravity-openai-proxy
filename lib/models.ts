@@ -12,6 +12,18 @@ export interface ModelSpec {
 }
 
 export const SUPPORTED_MODELS: ModelSpec[] = [
+  // 0. Image Generation (Native Multimodal Image Wire Model)
+  {
+    id: "gemini-3.1-flash-image",
+    name: "Gemini 3.1 Flash Image (Nano Banana 2)",
+    wireModel: "gemini-3.1-flash-image",
+    defaultThinkingBudget: 0,
+    description: "Google's native high-resolution image generation model.",
+    tier: "Image",
+    speed: "Fast",
+    contextWindow: 4096,
+  },
+
   // 1. Gemini 3.8 Flash Series (Next-Gen Flagship)
   {
     id: "gemini-3.8-flash-high",
@@ -399,6 +411,11 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   }
   if (clean === 'gemini-2.5-flash') {
     return { wireModel: 'gemini-2.5-flash', defaultThinkingBudget: 0 };
+  }
+
+  // Image models
+  if (clean === 'gemini-3.1-flash-image') {
+    return { wireModel: 'gemini-3.1-flash-image', defaultThinkingBudget: 0 };
   }
 
   // Claude models

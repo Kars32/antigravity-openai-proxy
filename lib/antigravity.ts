@@ -374,18 +374,39 @@ export function transformOpenAIToAntigravity(
 
   const isWebSearch = isWebSearchRequested(body, body.model, resolved);
   const googleTools = transformOpenAIToolsToGoogle(body.tools) || [];
+  const hasFunctionDecls = googleTools.some((t: any) => Array.isArray(t.functionDeclarations) && t.functionDeclarations.length > 0);
+
   if (isWebSearch) {
-    googleTools.push({ googleSearch: {} });
+    if (!hasFunctionDecls) {
+      googleTools.push({ googleSearch: {} });
+    } else {
+      // Upstream Daily CloudCode PA rejects built-in { googleSearch: {} } when combined with functionDeclarations.
+      // Expose google_search as a function declaration so the model can invoke web search without upstream HTTP 400.
+      const firstGroup = googleTools.find((t: any) => Array.isArray(t.functionDeclarations));
+      if (firstGroup && !firstGroup.functionDeclarations.some((d: any) => d.name === 'google_search')) {
+        firstGroup.functionDeclarations.push({
+          name: 'google_search',
+          description: 'Search Google and the live web for real-time information, current news, facts, people, or external knowledge.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              query: {
+                type: 'STRING',
+                description: 'The search query to look up on Google.',
+              },
+            },
+            required: ['query'],
+          },
+        });
+      }
+    }
   }
 
   if (googleTools.length > 0) {
     reqObj.tools = googleTools;
-    const hasFunctionDecls = googleTools.some((t: any) => Array.isArray(t.functionDeclarations) && t.functionDeclarations.length > 0);
-    if (hasFunctionDecls) {
-      const toolConfig = formatToolChoice(body.tool_choice);
-      if (toolConfig) {
-        reqObj.toolConfig = { functionCallingConfig: toolConfig };
-      }
+    const toolConfig = formatToolChoice(body.tool_choice);
+    if (hasFunctionDecls && toolConfig) {
+      reqObj.toolConfig = { functionCallingConfig: toolConfig };
     }
   }
 

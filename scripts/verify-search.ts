@@ -115,10 +115,15 @@ async function main() {
     resolveModel('gemini-3.8-flash')!,
     'test-proj'
   );
-  assert.strictEqual(wireHybrid.request.tools.length, 2, 'Tools must contain both functionDeclarations and googleSearch');
-  assert.ok(wireHybrid.request.tools[0].functionDeclarations, 'functionDeclarations must be preserved');
-  assert.deepStrictEqual(wireHybrid.request.tools[1], { googleSearch: {} }, 'googleSearch must be injected');
-  assert.deepStrictEqual(wireHybrid.request.toolConfig, { functionCallingConfig: { mode: 'AUTO' } }, 'toolConfig must be preserved');
+  assert.strictEqual(wireHybrid.request.tools.length, 1, 'Tools must contain one tool object with functionDeclarations');
+  const decls = wireHybrid.request.tools[0].functionDeclarations;
+  assert.ok(decls.some((d: any) => d.name === 'get_stock_price'), 'get_stock_price must be present');
+  assert.ok(decls.some((d: any) => d.name === 'google_search'), 'google_search must be injected into functionDeclarations');
+  assert.deepStrictEqual(
+    wireHybrid.request.toolConfig,
+    { functionCallingConfig: { mode: 'AUTO' } },
+    'toolConfig must preserve functionCallingConfig'
+  );
   console.log('✅ Wire injection and hybrid tool preservation verified.\n');
 
   // Test 5: Grounding Metadata Formatting
@@ -239,6 +244,51 @@ async function main() {
   assert.ok(fullAssistantResponse.includes('http'), 'Response must contain verified source links');
 
   console.log('✅ Live upstream grounding call succeeded with HTTP 200 and verified markdown sources!\n');
+
+  // Test 7: Live Upstream Hybrid Call (Functions + Web Search)
+  console.log('Test 7: Live Upstream Hybrid Verification (Functions + Web Search)');
+  const hybridRequest = {
+    model: 'gemini-3.8-flash-search',
+    messages: [
+      { role: 'user', content: 'whos tibo the reset guy' }
+    ],
+    tools: [
+      {
+        type: 'function',
+        function: {
+          name: 'get_server_overview',
+          description: 'Get Discord server overview',
+          parameters: { type: 'object', properties: {} }
+        }
+      }
+    ],
+    tool_choice: 'auto'
+  };
+
+  const hybridEnvelope = transformOpenAIToAntigravity(hybridRequest, resolvedModelForCall!, projectId);
+  assert.ok(hybridEnvelope.request.tools, 'tools must be present');
+  const hybridDecls = hybridEnvelope.request.tools[0].functionDeclarations;
+  assert.ok(hybridDecls.some((d: any) => d.name === 'get_server_overview'), 'get_server_overview must be present');
+  assert.ok(hybridDecls.some((d: any) => d.name === 'google_search'), 'google_search must be present');
+
+  const liveHybridRes = await fetch('https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      'User-Agent': 'antigravity/2.22.0 windows/amd64',
+    },
+    body: JSON.stringify(hybridEnvelope),
+  });
+
+  if (liveHybridRes.status !== 200) {
+    const errText = await liveHybridRes.text();
+    throw new Error(`Hybrid request failed with HTTP ${liveHybridRes.status}: ${errText}`);
+  }
+  assert.strictEqual(liveHybridRes.status, 200, 'Upstream streamGenerateContent with functions + search must return HTTP 200');
+  console.log('✅ Live upstream hybrid call (functions + search) succeeded with HTTP 200!\n');
+
   console.log('🎉 ALL ANTIGRAVITY OPENAI PROXY TESTS PASSED SUCCESSFULLY!');
 }
 

@@ -297,10 +297,57 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
   }))
 ];
 
+// Map for O(1) exact catalog lookups
+const SUPPORTED_MODEL_MAP = new Map<string, ModelSpec>(
+  SUPPORTED_MODELS.map(m => [m.id, m])
+);
+
+let cachedModelListResponse: { object: string; data: any[] } | null = null;
+
+export function getModelListResponse() {
+  if (cachedModelListResponse) {
+    return cachedModelListResponse;
+  }
+  const openCodeModelSet = new Set<string>(OPENCODE_MODELS.map(m => m.id));
+  cachedModelListResponse = {
+    object: 'list',
+    data: SUPPORTED_MODELS.map(m => ({
+      id: m.id,
+      object: 'model',
+      created: 1700000000,
+      owned_by: openCodeModelSet.has(m.id) ? 'opencode' : 'google-antigravity',
+      permission: [],
+      root: m.wireModel,
+      parent: null,
+    }))
+  };
+  return cachedModelListResponse;
+}
+
+// Bounded memoization cache for deterministic model resolutions
+const RESOLVE_MODEL_CACHE = new Map<string, { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null>();
+const MAX_MODEL_CACHE_SIZE = 500;
+
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
   if (!modelId) return null;
-  const clean = modelId.trim().toLowerCase();
+  const rawKey = modelId.trim().toLowerCase();
 
+  const cached = RESOLVE_MODEL_CACHE.get(rawKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = uncachedResolveModel(rawKey);
+
+  if (RESOLVE_MODEL_CACHE.size >= MAX_MODEL_CACHE_SIZE) {
+    RESOLVE_MODEL_CACHE.clear();
+  }
+  RESOLVE_MODEL_CACHE.set(rawKey, result);
+
+  return result;
+}
+
+function uncachedResolveModel(clean: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
   // Search suffix detection (:search, -search, :web, -web)
   let isWebSearch = false;
   let baseClean = clean;
@@ -318,8 +365,8 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
     baseClean = baseClean.slice(0, -4);
   }
 
-  // Exact ID match
-  const exact = SUPPORTED_MODELS.find(m => m.id === clean);
+  // Exact O(1) ID match
+  const exact = SUPPORTED_MODEL_MAP.get(clean);
   if (exact) {
     const isSearchModel = clean.endsWith('-search') || clean.endsWith('-web') || isWebSearch;
     return {

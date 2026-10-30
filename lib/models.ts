@@ -297,6 +297,36 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     speed: "Deep",
     contextWindow: 1048576,
   },
+  {
+    id: "opus-4.6-search",
+    name: "Claude Opus 4.6 (Search)",
+    wireModel: "claude-opus-4-6-thinking",
+    defaultThinkingBudget: 6500,
+    description: "Claude Opus 4.6 flagship reasoning model with native Google Search grounding and 6.5K thinking budget.",
+    tier: "Search",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+  {
+    id: "claude-opus-4-6-search",
+    name: "Claude Opus 4.6 (Search)",
+    wireModel: "claude-opus-4-6-thinking",
+    defaultThinkingBudget: 6500,
+    description: "Claude Opus 4.6 flagship reasoning model with native Google Search grounding and 6.5K thinking budget.",
+    tier: "Search",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+  {
+    id: "opus-4.6-web",
+    name: "Claude Opus 4.6 (Web)",
+    wireModel: "claude-opus-4-6-thinking",
+    defaultThinkingBudget: 6500,
+    description: "Claude Opus 4.6 flagship reasoning model with native web search grounding and 6.5K thinking budget.",
+    tier: "Search",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
   ...OPENCODE_MODELS.map(m => ({
     id: m.id,
     name: m.name,
@@ -419,10 +449,26 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   }
 
   // Claude models
+  if (
+    clean === 'opus-4.6-search' ||
+    clean === 'opus-4.6:search' ||
+    clean === 'opus-4-6-search' ||
+    clean === 'claude-opus-4-6-search' ||
+    clean === 'claude-opus-4.6-search' ||
+    clean === 'claude-opus-4-6:search' ||
+    clean === 'opus-4.6-web' ||
+    clean === 'opus-4.6:web' ||
+    clean === 'opus-4-6-web' ||
+    clean === 'claude-opus-4-6-web' ||
+    clean === 'claude-opus-4.6-web' ||
+    clean === 'claude-opus-4-6:web'
+  ) {
+    return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 6500, isWebSearch: true };
+  }
   if (clean === 'claude-sonnet-4-6' || clean === 'claude-sonnet-4.6' || clean === 'claude-3-7-sonnet' || clean === 'claude-3-5-sonnet' || clean === 'claude-sonnet') {
     return { wireModel: 'claude-sonnet-4-6', defaultThinkingBudget: 16384 };
   }
-  if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus') {
+  if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus-4.6' || clean === 'claude-opus' || clean === 'opus-4.6' || clean === 'opus-4-6') {
     return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 };
   }
 

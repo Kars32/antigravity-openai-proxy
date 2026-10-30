@@ -222,10 +222,7 @@ assert.deepStrictEqual(res10Multimodal.request.contents[0].parts[1].inlineData, 
   mimeType: 'image/png',
   data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 });
-assert.deepStrictEqual(res10Multimodal.request.contents[0].parts[1].inline_data, {
-  mime_type: 'image/png',
-  data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-});
+assert.strictEqual((res10Multimodal.request.contents[0].parts[1] as any).inline_data, undefined, 'Must omit inline_data to avoid protobuf oneof collision');
 
 // 10.3 Standalone image part (no text)
 const res10ImageOnly = transformOpenAIToAntigravity(
@@ -263,6 +260,56 @@ const res10StringUrl = transformOpenAIToAntigravity(
   'test-proj'
 );
 assert.strictEqual(res10StringUrl.request.contents[0].parts[0].inlineData.mimeType, 'image/png');
+
+// 10.5 parseDataUri edge cases: uppercase, whitespace, RFC 2397 params, interior newlines, invalid empty
+const parsedUpper = parseDataUri('  DATA:IMAGE/JPEG;BASE64,iVBORw0KGgo=  ');
+assert.strictEqual(parsedUpper?.mimeType, 'image/jpeg');
+assert.strictEqual(parsedUpper?.data, 'iVBORw0KGgo=');
+
+const parsedParams = parseDataUri('data:image/png;name=photo.png;charset=utf-8;base64,iVBORw0KGgo=');
+assert.strictEqual(parsedParams?.mimeType, 'image/png');
+assert.strictEqual(parsedParams?.data, 'iVBORw0KGgo=');
+
+const parsedNewlines = parseDataUri('data:image/png;base64,iVBO\r\nRw0K\nGgo=');
+assert.strictEqual(parsedNewlines?.data, 'iVBORw0KGgo=');
+
+assert.strictEqual(parseDataUri('data:image/png;base64,'), null, 'Empty base64 data must return null');
+assert.strictEqual(parseDataUri(null as any), null, 'Null must return null');
+
+// 10.6 Flat url and Anthropic image format support
+const res10FlatUrl = transformOpenAIToAntigravity(
+  {
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', url: sample1x1Png } as any
+        ]
+      }
+    ]
+  },
+  { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+  'test-proj'
+);
+assert.strictEqual(res10FlatUrl.request.contents[0].parts[0].inlineData.mimeType, 'image/png');
+
+const res10Anthropic = transformOpenAIToAntigravity(
+  {
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'abc\ndef\r\n' } } as any
+        ]
+      }
+    ]
+  },
+  { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+  'test-proj'
+);
+assert.strictEqual(res10Anthropic.request.contents[0].parts[0].inlineData.mimeType, 'image/jpeg');
+assert.strictEqual(res10Anthropic.request.contents[0].parts[0].inlineData.data, 'abcdef');
+
 console.log('✓ Test 10: Multimodal image data URI transformation passed');
 
 // Test 11: Single-flight OAuth token deduplication

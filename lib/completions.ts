@@ -335,7 +335,7 @@ export async function handleChatCompletions(req: NextRequest) {
                         }
 
                         if (part.functionCall) {
-                          const callId = `call_${crypto.randomUUID().slice(0, 8)}`;
+                          const callId = part.functionCall.id || `call_${crypto.randomUUID().slice(0, 8)}`;
                           const toolCallObj: any = {
                             index: toolCallIndex++,
                             id: callId,
@@ -476,8 +476,9 @@ export async function handleChatCompletions(req: NextRequest) {
                 contentText += part.text;
               }
               if (part.functionCall) {
+                const callId = part.functionCall.id || `call_${crypto.randomUUID().slice(0, 8)}`;
                 const toolCallObj: any = {
-                  id: `call_${crypto.randomUUID().slice(0, 8)}`,
+                  id: callId,
                   type: 'function',
                   function: {
                     name: part.functionCall.name,
@@ -518,13 +519,15 @@ export async function handleChatCompletions(req: NextRequest) {
             if (searchSummary) {
               if (toolCalls.length === 1) {
                 // google_search was the sole tool call: complete the loop and return grounded answer directly!
+                const searchCallId = `call_${crypto.randomUUID().slice(0, 8)}`;
                 const subContents = [...(envelope.request.contents || [])];
                 subContents.push({
                   role: 'model',
                   parts: [{
                     functionCall: {
                       name: 'google_search',
-                      args: { query: searchQuery.trim() }
+                      args: { query: searchQuery.trim() },
+                      id: searchCallId,
                     }
                   }]
                 });
@@ -533,7 +536,8 @@ export async function handleChatCompletions(req: NextRequest) {
                   parts: [{
                     functionResponse: {
                       name: 'google_search',
-                      response: { result: searchSummary }
+                      response: { result: searchSummary },
+                      id: searchCallId,
                     }
                   }]
                 });

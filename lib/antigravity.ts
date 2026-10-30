@@ -204,6 +204,7 @@ export function transformOpenAIToAntigravity(
   const systemBlocks: string[] = [];
   const merged: { role: 'user' | 'model'; parts: any[] }[] = [];
   const toolCallNames = new Map<string, string>();
+  const toolCallIds = new Map<string, string>();
 
   const appendTurn = (role: 'user' | 'model', parts: any[]) => {
     if (parts.length === 0) return;
@@ -229,7 +230,7 @@ export function transformOpenAIToAntigravity(
     const role: 'user' | 'model' = m.role === 'assistant' ? 'model' : 'user';
     const parts: any[] = [];
 
-    if (m.role === 'tool') {
+    if (m.role === 'tool' || m.role === 'function') {
       let parsedResponse: any;
       try {
         parsedResponse = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
@@ -244,11 +245,13 @@ export function transformOpenAIToAntigravity(
         : { response: parsedResponse ?? '' };
 
       const resolvedName = m.name || (m.tool_call_id ? toolCallNames.get(m.tool_call_id) : undefined) || 'tool_response';
+      const resolvedId = m.tool_call_id || toolCallIds.get(resolvedName) || `call_${crypto.randomUUID().slice(0, 8)}`;
 
       parts.push({
         functionResponse: {
           name: resolvedName,
-          response: formattedResponse
+          response: formattedResponse,
+          id: resolvedId,
         }
       });
       appendTurn('user', parts);
@@ -260,8 +263,14 @@ export function transformOpenAIToAntigravity(
         parts.push({ text: m.content });
       }
       for (const tc of m.tool_calls) {
-        if (tc.id && tc.function?.name) {
-          toolCallNames.set(tc.id, tc.function.name);
+        const callId = tc.id || `call_${crypto.randomUUID().slice(0, 8)}`;
+        if (tc.function?.name) {
+          toolCallNames.set(callId, tc.function.name);
+          toolCallIds.set(tc.function.name, callId);
+          if (tc.id) {
+            toolCallNames.set(tc.id, tc.function.name);
+            toolCallIds.set(tc.function.name, tc.id);
+          }
         }
 
         let args = {};
@@ -279,7 +288,8 @@ export function transformOpenAIToAntigravity(
         parts.push({
           functionCall: {
             name: tc.function?.name || 'function',
-            args
+            args,
+            id: callId,
           },
           thoughtSignature,
           thought_signature: thoughtSignature
@@ -294,6 +304,7 @@ export function transformOpenAIToAntigravity(
         parts.push({ text: m.content });
       }
       const fc = (m as any).function_call;
+      const callId = (fc as any).id || `call_${crypto.randomUUID().slice(0, 8)}`;
       let args = {};
       try {
         args = typeof fc.arguments === 'string' ? JSON.parse(fc.arguments) : (fc.arguments || {});
@@ -303,7 +314,8 @@ export function transformOpenAIToAntigravity(
       parts.push({
         functionCall: {
           name: fc.name || 'function',
-          args
+          args,
+          id: callId,
         },
         thoughtSignature: 'skip_thought_signature_validator',
         thought_signature: 'skip_thought_signature_validator'

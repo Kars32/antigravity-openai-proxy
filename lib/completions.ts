@@ -5,6 +5,8 @@ import {
   pickAccount,
   getAccessToken,
   transformOpenAIToAntigravity,
+  getAntigravityHeaders,
+  deriveDeterministicSessionId,
 } from './antigravity';
 import { resolveModel } from './models';
 import { resolveOpenCodeModel, executeOpenCodeCompletion } from './opencode';
@@ -24,15 +26,21 @@ interface SearchQueryResult {
   sources: string;
 }
 
-async function executeSearchQueryInternal(query: string, accessToken: string, projectId: string): Promise<SearchQueryResult> {
+async function executeSearchQueryInternal(
+  query: string,
+  accessToken: string,
+  projectId: string,
+  parentSessionId?: string
+): Promise<SearchQueryResult> {
+  const effectiveSessionId = parentSessionId || deriveDeterministicSessionId([], undefined, undefined, `search:${projectId}:${query}`);
   const envelope = {
-    project: projectId,
+    project: projectId || 'aicode-consumers',
     requestId: 'agent/' + Date.now() + '/search',
     userAgent: 'antigravity',
     requestType: 'agent',
     model: 'gemini-3.8-flash-tiered',
     request: {
-      sessionId: `-${Date.now()}`,
+      sessionId: effectiveSessionId,
       contents: [{ role: 'user', parts: [{ text: `Search Google for: ${query}. Summarize the key facts concisely and accurately.` }] }],
       tools: [{ googleSearch: {} }]
     }
@@ -42,12 +50,7 @@ async function executeSearchQueryInternal(query: string, accessToken: string, pr
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          'User-Agent': 'antigravity/2.22.0 windows/amd64',
-        },
+        headers: getAntigravityHeaders(accessToken, 'text/event-stream'),
         body: JSON.stringify(envelope),
       });
 
@@ -116,6 +119,13 @@ export async function handleChatCompletions(req: NextRequest) {
       { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
     );
   }
+
+  const clientSessionId =
+    req.headers.get('x-session-id') ||
+    req.headers.get('x-chat-id') ||
+    req.headers.get('session-id') ||
+    req.headers.get('chat-id') ||
+    undefined;
 
   const modelId = (body.model || 'gemini-3.7-flash').trim();
   const openCodeResolved = resolveOpenCodeModel(modelId);
@@ -214,19 +224,16 @@ export async function handleChatCompletions(req: NextRequest) {
   for (const account of accountsToTry) {
     try {
       const accessToken = await getAccessToken(account);
-      const envelope = transformOpenAIToAntigravity(body, resolved, account.projectId);
+      const envelope = transformOpenAIToAntigravity(body, resolved, account.projectId || 'aicode-consumers', {
+        sessionId: clientSessionId,
+      });
 
       let upstreamRes: Response | null = null;
       for (const upstreamUrl of UPSTREAM_URLS) {
         try {
           const res = await fetch(upstreamUrl, {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              Accept: 'text/event-stream',
-              'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
-            },
+            headers: getAntigravityHeaders(accessToken, 'text/event-stream'),
             body: JSON.stringify(envelope),
           });
 
@@ -422,7 +429,7 @@ export async function handleChatCompletions(req: NextRequest) {
                       searchQuery = typeof sc.args === 'string' ? sc.args : '';
                     }
                     const res = searchQuery.trim()
-                      ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId)
+                      ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId || 'aicode-consumers', envelope.request.sessionId)
                       : { summary: '', sources: '' };
                     return {
                       id: sc.id,
@@ -469,12 +476,7 @@ export async function handleChatCompletions(req: NextRequest) {
                   try {
                     const sRes = await fetch(upstreamUrl, {
                       method: 'POST',
-                      headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                        Accept: 'text/event-stream',
-                        'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
-                      },
+                      headers: getAntigravityHeaders(accessToken, 'text/event-stream'),
                       body: JSON.stringify(subEnvelope),
                     });
                     if (sRes.ok) {
@@ -678,7 +680,7 @@ export async function handleChatCompletions(req: NextRequest) {
                 searchQuery = sc.function.arguments || '';
               }
               const res = searchQuery.trim()
-                ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId)
+                ? await executeSearchQueryInternal(searchQuery.trim(), accessToken, account.projectId || 'aicode-consumers', envelope.request.sessionId)
                 : { summary: '', sources: '' };
               return {
                 id: sc.id || `call_${crypto.randomUUID().slice(0, 8)}`,
@@ -725,12 +727,7 @@ export async function handleChatCompletions(req: NextRequest) {
               try {
                 const subRes = await fetch(upstreamUrl, {
                   method: 'POST',
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                    Accept: 'text/event-stream',
-                    'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64',
-                  },
+                  headers: getAntigravityHeaders(accessToken, 'text/event-stream'),
                   body: JSON.stringify(subEnvelope),
                 });
 

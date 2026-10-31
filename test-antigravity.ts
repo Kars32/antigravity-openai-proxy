@@ -123,9 +123,9 @@ const res6 = transformOpenAIToAntigravity(
 assert.strictEqual(res6.request.contents.length, 3);
 const toolParts = res6.request.contents[2].parts;
 assert.strictEqual(toolParts.length, 3);
-assert.deepStrictEqual(toolParts[0].functionResponse, { name: 'is_ready', response: { response: true } });
-assert.deepStrictEqual(toolParts[1].functionResponse, { name: 'get_count', response: { response: 100 } });
-assert.deepStrictEqual(toolParts[2].functionResponse, { name: 'get_list', response: { response: ['item1', 'item2'] } });
+assert.deepStrictEqual(toolParts[0].functionResponse, { name: 'is_ready', response: { response: true }, id: 'c_bool' });
+assert.deepStrictEqual(toolParts[1].functionResponse, { name: 'get_count', response: { response: 100 }, id: 'c_num' });
+assert.deepStrictEqual(toolParts[2].functionResponse, { name: 'get_list', response: { response: ['item1', 'item2'] }, id: 'c_arr' });
 console.log('✓ Test 6: Protobuf Struct wrapping for scalar tool responses passed');
 
 // Test 7: Function name resolution from tool_call_id when name is omitted
@@ -353,7 +353,66 @@ async function runAsyncTests() {
     global.fetch = originalFetch;
   }
 
-  console.log('\nAll 11 test suites passed successfully!');
+  // Test 12: Desktop Antigravity IDE Authentic Headers Cloaking
+  const { ANTIGRAVITY_USER_AGENT, ANTIGRAVITY_API_CLIENT, getAntigravityHeaders, deriveDeterministicSessionId, BANNED_ACCOUNTS } = await import('./lib/antigravity');
+  assert.strictEqual(ANTIGRAVITY_USER_AGENT, 'antigravity/2.22.0 windows/amd64', 'User-Agent must match authentic IDE');
+  assert.strictEqual(ANTIGRAVITY_API_CLIENT, 'gl-node/20.18.0 gccl/2.22.0', 'API Client must match authentic gl-node client');
+  const headers = getAntigravityHeaders('mock_token_123', 'text/event-stream');
+  assert.strictEqual(headers['User-Agent'], 'antigravity/2.22.0 windows/amd64');
+  assert.strictEqual(headers['X-Goog-Api-Client'], 'gl-node/20.18.0 gccl/2.22.0');
+  assert.strictEqual(headers['Authorization'], 'Bearer mock_token_123');
+  assert.strictEqual(headers['Accept'], 'text/event-stream');
+  console.log('✓ Test 12: Desktop Antigravity IDE Telemetry Cloaking headers passed');
+
+  // Test 13: Deterministic conversation-anchored sessionId derivation across multi-turn conversation
+  const turn1Messages = [
+    { role: 'user', content: 'Write a TypeScript function to calculate Fibonacci' }
+  ];
+  const turn2Messages = [
+    { role: 'user', content: 'Write a TypeScript function to calculate Fibonacci' },
+    { role: 'assistant', content: 'function fib(n: number)...' },
+    { role: 'user', content: 'Now optimize it with memoization' }
+  ];
+  const wireTurn1 = transformOpenAIToAntigravity({ messages: turn1Messages }, { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 }, 'test-proj');
+  const wireTurn2 = transformOpenAIToAntigravity({ messages: turn2Messages }, { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 }, 'test-proj');
+
+  assert.ok(/^-\d+$/.test(wireTurn1.request.sessionId), 'Turn 1 sessionId must be negative numeric string');
+  assert.ok(/^-\d+$/.test(wireTurn2.request.sessionId), 'Turn 2 sessionId must be negative numeric string');
+  assert.strictEqual(wireTurn1.request.sessionId, wireTurn2.request.sessionId, 'Consecutive turns in same conversation MUST have identical sessionId');
+  console.log('✓ Test 13: Stable conversation-anchored sessionId across turns passed');
+
+  // Test 14: Custom session ID / chatId derivation
+  const customWire1 = transformOpenAIToAntigravity(
+    { messages: turn1Messages },
+    { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+    'test-proj',
+    { sessionId: 'session-xyz-987' }
+  );
+  const customWire2 = transformOpenAIToAntigravity(
+    { messages: turn2Messages },
+    { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+    'test-proj',
+    { sessionId: 'session-xyz-987' }
+  );
+  assert.ok(/^-\d+$/.test(customWire1.request.sessionId), 'Custom sessionId must format to negative numeric string');
+  assert.strictEqual(customWire1.request.sessionId, customWire2.request.sessionId, 'Same custom session ID produces identical wire sessionId');
+  console.log('✓ Test 14: Custom session ID and chatId anchoring passed');
+
+  // Test 15: Safe project isolation fallback
+  const fallbackWire = transformOpenAIToAntigravity(
+    { messages: turn1Messages },
+    { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+    ''
+  );
+  assert.strictEqual(fallbackWire.project, 'aicode-consumers', 'Empty projectId must safely fallback to aicode-consumers without cross-account contamination');
+  console.log('✓ Test 15: Safe project isolation fallback passed');
+
+  // Test 16: Banned accounts filter
+  assert.ok(BANNED_ACCOUNTS.has('kars86120@gmail.com'), 'kars86120@gmail.com must be in BANNED_ACCOUNTS');
+  assert.ok(BANNED_ACCOUNTS.has('kars86120'), 'kars86120 must be in BANNED_ACCOUNTS');
+  console.log('✓ Test 16: Banned accounts filter passed');
+
+  console.log('\nAll 16 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

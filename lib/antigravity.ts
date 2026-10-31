@@ -35,6 +35,24 @@ export const UNRESTRICTED_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
 ];
 
+export const ANTIGRAVITY_USER_AGENT = 'antigravity/2.22.0 windows/amd64';
+export const ANTIGRAVITY_API_CLIENT = 'gl-node/20.18.0 gccl/2.22.0';
+
+export function getAntigravityHeaders(accessToken?: string, accept: string = 'text/event-stream'): Record<string, string> {
+  const headers: Record<string, string> = {
+    'User-Agent': ANTIGRAVITY_USER_AGENT,
+    'X-Goog-Api-Client': ANTIGRAVITY_API_CLIENT,
+    'Content-Type': 'application/json',
+    'Accept': accept,
+  };
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  return headers;
+}
+
+export const BANNED_ACCOUNTS = new Set(['kars86120@gmail.com', 'kars86120']);
+
 let cachedAccounts: AccountConfig[] | null = null;
 let nextAccountIdx = 0;
 
@@ -46,6 +64,10 @@ export function getAccounts(): AccountConfig[] {
     const token = (process.env[`ACCOUNT_${i}_REFRESH_TOKEN`] || '').trim();
     if (!token) continue;
     const name = (process.env[`ACCOUNT_${i}_NAME`] || `Account ${i}`).trim();
+    if (BANNED_ACCOUNTS.has(name.toLowerCase())) {
+      console.warn(`[Proxy Security]: Account #${i} (${name}) is banned and has been excluded from the pool.`);
+      continue;
+    }
     const projectId = (process.env[`ACCOUNT_${i}_PROJECT_ID`] || '').trim();
     accounts.push({
       id: `acc_${i}`,
@@ -60,16 +82,19 @@ export function getAccounts(): AccountConfig[] {
   }
 
   if (accounts.length === 0 && process.env.GOOGLE_REFRESH_TOKEN) {
-    accounts.push({
-      id: 'acc_default',
-      name: 'Default Account',
-      refreshToken: process.env.GOOGLE_REFRESH_TOKEN.trim(),
-      projectId: process.env.GOOGLE_PROJECT_ID || '',
-      accessToken: null,
-      expiresAt: 0,
-      cooldownUntil: 0,
-      failCount: 0
-    });
+    const defaultName = (process.env.GOOGLE_ACCOUNT_NAME || 'Default Account').trim();
+    if (!BANNED_ACCOUNTS.has(defaultName.toLowerCase())) {
+      accounts.push({
+        id: 'acc_default',
+        name: defaultName,
+        refreshToken: process.env.GOOGLE_REFRESH_TOKEN.trim(),
+        projectId: process.env.GOOGLE_PROJECT_ID || '',
+        accessToken: null,
+        expiresAt: 0,
+        cooldownUntil: 0,
+        failCount: 0
+      });
+    }
   }
 
   cachedAccounts = accounts;
@@ -128,7 +153,8 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
-          'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64'
+          'User-Agent': ANTIGRAVITY_USER_AGENT,
+          'X-Goog-Api-Client': ANTIGRAVITY_API_CLIENT,
         },
         body: params.toString(),
       });
@@ -142,22 +168,26 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
       account.accessToken = data.access_token;
       account.expiresAt = now + ((data.expires_in || 3600) * 1000);
 
+      // Strict per-account project discovery: query metadata with the account's own token
       if (!account.projectId) {
         try {
           const metaRes = await fetch('https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssistMetadata', {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${account.accessToken}`,
-              'Content-Type': 'application/json',
-              'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64'
-            },
+            headers: getAntigravityHeaders(account.accessToken, 'application/json'),
             body: JSON.stringify({ metadata: { ideType: 'VSCODE', ideVersion: '1.96.0' } })
           });
           if (metaRes.ok) {
             const meta: any = await metaRes.json();
-            if (meta.project) account.projectId = meta.project;
+            const discovered = meta.project || meta.cloudaicompanionProject || meta.projectId;
+            if (discovered) account.projectId = discovered;
           }
         } catch {}
+      }
+
+      // Safe isolated fallback: if project is still missing, fallback to a neutral consumer identifier
+      // NEVER allow borrowing or impersonating another account's project ID!
+      if (!account.projectId) {
+        account.projectId = 'aicode-consumers';
       }
 
       return account.accessToken as string;
@@ -189,10 +219,74 @@ export function parseDataUri(uri: string): { mimeType: string; data: string } | 
   };
 }
 
+/**
+ * Derives a deterministic, conversation-anchored session ID for Google CloudCode PA.
+ * Produces a stable negative numeric string (e.g. `-${hashNumber}`) so consecutive turns
+ * within the same conversation reuse the exact same session identity instead of churning
+ * single-use negative timestamps on every turn.
+ */
+export function deriveDeterministicSessionId(
+  messages: any[],
+  options?: { sessionId?: string; chatId?: string },
+  body?: any,
+  systemText?: string
+): string {
+  // 1. Explicit seed from options, headers, or body
+  const explicit =
+    options?.sessionId ||
+    options?.chatId ||
+    body?.sessionId ||
+    body?.session_id ||
+    body?.chatId ||
+    body?.chat_id;
+
+  if (explicit) {
+    const trimmed = String(explicit).trim();
+    if (/^-\d{4,}$/.test(trimmed)) {
+      return trimmed;
+    }
+    if (/^\d{4,}$/.test(trimmed)) {
+      return `-${trimmed}`;
+    }
+    const hash = crypto.createHash('sha256').update(`ses:${trimmed}`).digest('hex');
+    const numericPart = parseInt(hash.slice(0, 12), 16);
+    return `-${Math.abs(numericPart) || 100000000000}`;
+  }
+
+  // 2. Conversation-anchored seed: opening user turn
+  let openingUserText = '';
+  if (Array.isArray(messages)) {
+    const firstUser = messages.find((m: any) => m && m.role === 'user');
+    if (firstUser) {
+      if (typeof firstUser.content === 'string') {
+        openingUserText = firstUser.content.trim();
+      } else if (Array.isArray(firstUser.content)) {
+        openingUserText = firstUser.content
+          .map((p: any) => (typeof p === 'string' ? p : p?.text || ''))
+          .join(' ')
+          .trim();
+      }
+    }
+  }
+
+  if (openingUserText) {
+    const hash = crypto.createHash('sha256').update(`conv:${openingUserText}`).digest('hex');
+    const numericPart = parseInt(hash.slice(0, 12), 16);
+    return `-${Math.abs(numericPart) || 100000000000}`;
+  }
+
+  // 3. Fallback: hash the system instruction or a stable constant
+  const fallbackSeed = (systemText && systemText.trim()) || 'antigravity-default-session';
+  const hash = crypto.createHash('sha256').update(`anchor:${fallbackSeed}`).digest('hex');
+  const numericPart = parseInt(hash.slice(0, 12), 16);
+  return `-${Math.abs(numericPart) || 100000000000}`;
+}
+
 export function transformOpenAIToAntigravity(
   body: any,
   resolved: { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean },
-  projectId: string
+  projectId: string,
+  options?: { sessionId?: string; chatId?: string }
 ) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   
@@ -438,8 +532,11 @@ export function transformOpenAIToAntigravity(
     generationConfig.stopSequences = stopList.filter((s: any) => typeof s === 'string' && s.length > 0);
   }
 
+  const systemText = systemBlocks.join('\n\n');
+  const sessionId = deriveDeterministicSessionId(messages, options, body, systemText);
+
   const reqObj: any = {
-    sessionId: `-${Date.now()}`,
+    sessionId,
     contents: merged,
     generationConfig,
     safetySettings: UNRESTRICTED_SAFETY_SETTINGS,
@@ -519,7 +616,7 @@ export function transformOpenAIToAntigravity(
   }
 
   return {
-    project: projectId,
+    project: projectId || 'aicode-consumers',
     requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
     userAgent: 'antigravity',
     requestType: 'agent',

@@ -178,7 +178,9 @@ async function main() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'antigravity/ide/2.1.1 darwin/arm64'
+      'Accept': 'application/json',
+      'User-Agent': 'antigravity/2.22.0 windows/amd64',
+      'X-Goog-Api-Client': 'gl-node/20.18.0 gccl/2.22.0'
     },
     body: tokenParams.toString(),
   });
@@ -206,6 +208,7 @@ async function main() {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
       'User-Agent': 'antigravity/2.22.0 windows/amd64',
+      'X-Goog-Api-Client': 'gl-node/20.18.0 gccl/2.22.0',
     },
     body: JSON.stringify(envelope),
   });
@@ -278,6 +281,7 @@ async function main() {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
       'User-Agent': 'antigravity/2.22.0 windows/amd64',
+      'X-Goog-Api-Client': 'gl-node/20.18.0 gccl/2.22.0',
     },
     body: JSON.stringify(hybridEnvelope),
   });

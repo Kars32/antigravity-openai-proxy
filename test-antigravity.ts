@@ -354,7 +354,7 @@ async function runAsyncTests() {
   }
 
   // Test 12: Desktop Antigravity IDE Authentic Headers Cloaking
-  const { ANTIGRAVITY_USER_AGENT, ANTIGRAVITY_API_CLIENT, getAntigravityHeaders, deriveDeterministicSessionId, BANNED_ACCOUNTS } = await import('./lib/antigravity');
+  const { ANTIGRAVITY_USER_AGENT, ANTIGRAVITY_API_CLIENT, getAntigravityHeaders, deriveDeterministicSessionId, BANNED_ACCOUNTS, isBannedAccount } = await import('./lib/antigravity');
   assert.strictEqual(ANTIGRAVITY_USER_AGENT, 'antigravity/2.22.0 windows/amd64', 'User-Agent must match authentic IDE');
   assert.strictEqual(ANTIGRAVITY_API_CLIENT, 'gl-node/20.18.0 gccl/2.22.0', 'API Client must match authentic gl-node client');
   const headers = getAntigravityHeaders('mock_token_123', 'text/event-stream');
@@ -379,9 +379,10 @@ async function runAsyncTests() {
   assert.ok(/^-\d+$/.test(wireTurn1.request.sessionId), 'Turn 1 sessionId must be negative numeric string');
   assert.ok(/^-\d+$/.test(wireTurn2.request.sessionId), 'Turn 2 sessionId must be negative numeric string');
   assert.strictEqual(wireTurn1.request.sessionId, wireTurn2.request.sessionId, 'Consecutive turns in same conversation MUST have identical sessionId');
+  assert.ok(/^agent\/\d+\/[0-9a-f]{8}$/.test(wireTurn1.requestId), 'Envelope requestId must match authentic agent/<timestamp>/<uuid8>');
   console.log('✓ Test 13: Stable conversation-anchored sessionId across turns passed');
 
-  // Test 14: Custom session ID / chatId derivation
+  // Test 14: Custom session ID and edge case fallback
   const customWire1 = transformOpenAIToAntigravity(
     { messages: turn1Messages },
     { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
@@ -396,7 +397,16 @@ async function runAsyncTests() {
   );
   assert.ok(/^-\d+$/.test(customWire1.request.sessionId), 'Custom sessionId must format to negative numeric string');
   assert.strictEqual(customWire1.request.sessionId, customWire2.request.sessionId, 'Same custom session ID produces identical wire sessionId');
-  console.log('✓ Test 14: Custom session ID and chatId anchoring passed');
+
+  // Whitespace-only custom sessionId must safely fall through to conversation-anchored user message
+  const whitespaceSessionWire = transformOpenAIToAntigravity(
+    { messages: turn1Messages },
+    { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 8192 },
+    'test-proj',
+    { sessionId: '   ' }
+  );
+  assert.strictEqual(whitespaceSessionWire.request.sessionId, wireTurn1.request.sessionId, 'Whitespace-only sessionId must fall through to conversation-anchored seed');
+  console.log('✓ Test 14: Custom session ID and whitespace edge-case fallback passed');
 
   // Test 15: Safe project isolation fallback
   const fallbackWire = transformOpenAIToAntigravity(
@@ -407,10 +417,15 @@ async function runAsyncTests() {
   assert.strictEqual(fallbackWire.project, 'aicode-consumers', 'Empty projectId must safely fallback to aicode-consumers without cross-account contamination');
   console.log('✓ Test 15: Safe project isolation fallback passed');
 
-  // Test 16: Banned accounts filter
-  assert.ok(BANNED_ACCOUNTS.has('kars86120@gmail.com'), 'kars86120@gmail.com must be in BANNED_ACCOUNTS');
-  assert.ok(BANNED_ACCOUNTS.has('kars86120'), 'kars86120 must be in BANNED_ACCOUNTS');
-  console.log('✓ Test 16: Banned accounts filter passed');
+  // Test 16: Banned accounts filter & robust pattern recognition
+  assert.ok(isBannedAccount('kars86120@gmail.com'), 'kars86120@gmail.com must be identified as banned');
+  assert.ok(isBannedAccount('kars86120'), 'kars86120 must be identified as banned');
+  assert.ok(isBannedAccount('KARS86120@GMAIL.COM'), 'Case-insensitive banned check must succeed');
+  assert.ok(isBannedAccount('kars86120 (Account 3)'), 'Substring match with label must be identified as banned');
+  assert.ok(isBannedAccount('kars86120@googlemail.com'), 'Variant domain must be identified as banned');
+  assert.strictEqual(isBannedAccount('yashv3050@gmail.com'), false, 'Legitimate account must not be flagged');
+  assert.strictEqual(isBannedAccount('Account 1'), false, 'Generic account label must not be flagged');
+  console.log('✓ Test 16: Banned accounts filter & pattern recognition passed');
 
   console.log('\nAll 16 test suites passed successfully!');
 }

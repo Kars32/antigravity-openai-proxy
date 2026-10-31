@@ -110,6 +110,9 @@ export async function generateSingleImage(prompt: string): Promise<{ mimeType: s
 
     const payload = {
       project: account.projectId || 'aicode-consumers',
+      requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
+      userAgent: 'antigravity',
+      requestType: 'agent',
       model: ALLOWED_IMAGE_MODEL,
       request: {
         sessionId: deriveDeterministicSessionId([], undefined, undefined, 'image:' + prompt),

@@ -35,7 +35,7 @@ async function executeSearchQueryInternal(
   const effectiveSessionId = parentSessionId || deriveDeterministicSessionId([], undefined, undefined, `search:${projectId}:${query}`);
   const envelope = {
     project: projectId || 'aicode-consumers',
-    requestId: 'agent/' + Date.now() + '/search',
+    requestId: 'agent/' + Date.now() + '/' + crypto.randomUUID().slice(0, 8),
     userAgent: 'antigravity',
     requestType: 'agent',
     model: 'gemini-3.8-flash-tiered',

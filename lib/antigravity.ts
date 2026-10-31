@@ -53,6 +53,14 @@ export function getAntigravityHeaders(accessToken?: string, accept: string = 'te
 
 export const BANNED_ACCOUNTS = new Set(['kars86120@gmail.com', 'kars86120']);
 
+export function isBannedAccount(name: string): boolean {
+  const clean = (name || '').toLowerCase().trim();
+  if (!clean) return false;
+  if (BANNED_ACCOUNTS.has(clean)) return true;
+  if (clean.includes('kars86120')) return true;
+  return false;
+}
+
 let cachedAccounts: AccountConfig[] | null = null;
 let nextAccountIdx = 0;
 
@@ -64,7 +72,7 @@ export function getAccounts(): AccountConfig[] {
     const token = (process.env[`ACCOUNT_${i}_REFRESH_TOKEN`] || '').trim();
     if (!token) continue;
     const name = (process.env[`ACCOUNT_${i}_NAME`] || `Account ${i}`).trim();
-    if (BANNED_ACCOUNTS.has(name.toLowerCase())) {
+    if (isBannedAccount(name)) {
       console.warn(`[Proxy Security]: Account #${i} (${name}) is banned and has been excluded from the pool.`);
       continue;
     }
@@ -83,7 +91,7 @@ export function getAccounts(): AccountConfig[] {
 
   if (accounts.length === 0 && process.env.GOOGLE_REFRESH_TOKEN) {
     const defaultName = (process.env.GOOGLE_ACCOUNT_NAME || 'Default Account').trim();
-    if (!BANNED_ACCOUNTS.has(defaultName.toLowerCase())) {
+    if (!isBannedAccount(defaultName)) {
       accounts.push({
         id: 'acc_default',
         name: defaultName,
@@ -240,8 +248,8 @@ export function deriveDeterministicSessionId(
     body?.chatId ||
     body?.chat_id;
 
-  if (explicit) {
-    const trimmed = String(explicit).trim();
+  const trimmed = explicit ? String(explicit).trim() : '';
+  if (trimmed) {
     if (/^-\d{4,}$/.test(trimmed)) {
       return trimmed;
     }

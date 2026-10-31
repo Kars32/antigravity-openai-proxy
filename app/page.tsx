@@ -227,8 +227,9 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
               <input
+                id="master-key-input"
                 type="password"
                 placeholder="KARS-..."
                 value={loginKeyInput}
@@ -239,7 +240,7 @@ export default function AntigravityOpenAIControlCenter() {
             </div>
 
             {loginError && (
-              <div style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
+              <div role="alert" aria-live="assertive" style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
                 {loginError}
               </div>
             )}
@@ -443,7 +444,7 @@ for await (const chunk of stream) {
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
+      <div role="tablist" aria-label="Dashboard sections" style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
         {[
           { id: 'models', label: '🧠 Native Antigravity Models' },
           { id: 'quickstart', label: '⚡ Quickstart & Code' },
@@ -452,6 +453,8 @@ for await (const chunk of stream) {
         ].map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             style={{
               backgroundColor: activeTab === tab.id ? '#27272a' : 'transparent',
@@ -499,6 +502,7 @@ for await (const chunk of stream) {
                       <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
                       <button
                         onClick={() => copyToClipboard(m.id, m.id)}
+                        aria-label={`Copy model ID ${m.id}`}
                         style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
                       >
                         {copiedField === m.id ? '✓' : 'Copy'}
@@ -516,7 +520,7 @@ for await (const chunk of stream) {
       {activeTab === 'quickstart' && (
         <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div role="tablist" aria-label="Code snippet languages" style={{ display: 'flex', gap: 6 }}>
               {[
                 { id: 'python', label: 'Python SDK' },
                 { id: 'curl', label: 'cURL' },
@@ -524,6 +528,8 @@ for await (const chunk of stream) {
               ].map(st => (
                 <button
                   key={st.id}
+                  role="tab"
+                  aria-selected={codeTab === st.id}
                   onClick={() => setCodeTab(st.id as any)}
                   style={{
                     backgroundColor: codeTab === st.id ? '#27272a' : 'transparent',
@@ -545,6 +551,7 @@ for await (const chunk of stream) {
                 const code = codeTab === 'python' ? pythonCode : codeTab === 'curl' ? curlCode : nodeCode;
                 copyToClipboard(code, 'code');
               }}
+              aria-live="polite"
               style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
             >
               {copiedField === 'code' ? '✓ Copied' : 'Copy Snippet'}
@@ -564,8 +571,9 @@ for await (const chunk of stream) {
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,8 +623,9 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <label htmlFor="prompt-input" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
               <textarea
+                id="prompt-input"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}

@@ -228,6 +228,146 @@ export function parseDataUri(uri: string): { mimeType: string; data: string } | 
 }
 
 /**
+ * Normalizes any format/extension shorthand into an IANA standard MIME type.
+ * Maps formats for audio, video, image, and document files.
+ */
+export function normalizeMimeType(formatOrMime?: string, defaultType: string = 'application/octet-stream'): string {
+  if (!formatOrMime || typeof formatOrMime !== 'string') return defaultType;
+  const clean = formatOrMime.toLowerCase().trim();
+  if (clean.includes('/')) return clean;
+
+  const MIME_MAP: Record<string, string> = {
+    // Audio
+    mp3: 'audio/mp3',
+    wav: 'audio/wav',
+    wave: 'audio/wav',
+    ogg: 'audio/ogg',
+    oga: 'audio/ogg',
+    opus: 'audio/opus',
+    aac: 'audio/aac',
+    m4a: 'audio/m4a',
+    flac: 'audio/flac',
+    webm: 'audio/webm',
+    weba: 'audio/webm',
+    mp4a: 'audio/mp4',
+    aiff: 'audio/aiff',
+    aif: 'audio/aiff',
+
+    // Video
+    mp4: 'video/mp4',
+    mpeg: 'video/mpeg',
+    mpg: 'video/mpeg',
+    mov: 'video/quicktime',
+    quicktime: 'video/quicktime',
+    avi: 'video/x-msvideo',
+    wmv: 'video/x-ms-wmv',
+    mkv: 'video/x-matroska',
+    '3gp': 'video/3gpp',
+    '3gpp': 'video/3gpp',
+    flv: 'video/x-flv',
+
+    // Image
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    bmp: 'image/bmp',
+    tiff: 'image/tiff',
+    tif: 'image/tiff',
+    svg: 'image/svg+xml',
+    ico: 'image/x-icon',
+    heic: 'image/heic',
+    heif: 'image/heif',
+
+    // Document & Text
+    pdf: 'application/pdf',
+    txt: 'text/plain',
+    csv: 'text/csv',
+    json: 'application/json',
+    xml: 'application/xml',
+    html: 'text/html',
+    htm: 'text/html',
+    md: 'text/markdown',
+  };
+
+  return MIME_MAP[clean] || `application/${clean}`;
+}
+
+/**
+ * Universal multimodal parser extracting { mimeType, data } from any media part:
+ * - OpenAI input_audio ({ type: 'input_audio', input_audio: { data, format } })
+ * - OpenAI audio_url ({ type: 'audio_url', audio_url: { url } })
+ * - OpenAI video_url ({ type: 'video_url', video_url: { url } })
+ * - OpenAI image_url ({ type: 'image_url', image_url: { url } })
+ * - Anthropic source ({ source: { type: 'base64', media_type, data } })
+ * - Gemini Native inlineData / inline_data ({ inlineData: { mimeType, data } })
+ * - Generic media payload objects (video, audio, document, file, media)
+ * - Base64 data URIs
+ */
+export function extractMultimodalInlineData(part: any): { mimeType: string; data: string } | null {
+  if (!part || typeof part !== 'object') return null;
+
+  // 1. Direct inlineData / inline_data (Gemini wire pass-through)
+  const inline = part.inlineData || part.inline_data;
+  if (inline && typeof inline.data === 'string') {
+    const rawData = inline.data.replace(/\s+/g, '');
+    if (rawData) {
+      const mimeType = normalizeMimeType(inline.mimeType || inline.mime_type, 'application/octet-stream');
+      return { mimeType, data: rawData };
+    }
+  }
+
+  // 2. Anthropic source format: { type: 'image' | 'audio' | 'video' | 'document', source: { type: 'base64', media_type, data } }
+  if (part.source?.type === 'base64' && typeof part.source?.data === 'string') {
+    const rawData = part.source.data.replace(/\s+/g, '');
+    if (rawData) {
+      const mimeType = normalizeMimeType(part.source.media_type || part.source.mediaType, 'application/octet-stream');
+      return { mimeType, data: rawData };
+    }
+  }
+
+  // 3. OpenAI input_audio: { type: 'input_audio', input_audio: { data, format } }
+  const inputAudio = part.input_audio || part.audio;
+  if (inputAudio && typeof inputAudio.data === 'string') {
+    const rawData = inputAudio.data.replace(/\s+/g, '');
+    if (rawData) {
+      const mimeType = normalizeMimeType(inputAudio.format || inputAudio.mime_type || inputAudio.mimeType, 'audio/mp3');
+      return { mimeType, data: rawData };
+    }
+  }
+
+  // 4. Video / Document / File / Media payload objects
+  const mediaObj = part.video || part.document || part.file || part.media;
+  if (mediaObj && typeof mediaObj.data === 'string') {
+    const rawData = mediaObj.data.replace(/\s+/g, '');
+    if (rawData) {
+      const defaultMime = part.type === 'video' ? 'video/mp4' : part.type === 'document' ? 'application/pdf' : 'application/octet-stream';
+      const mimeType = normalizeMimeType(mediaObj.format || mediaObj.mime_type || mediaObj.mimeType, defaultMime);
+      return { mimeType, data: rawData };
+    }
+  }
+
+  // 5. URL-based media (data URIs): image_url, audio_url, video_url, file_url, document_url
+  const rawUrl =
+    (typeof part.image_url === 'string' ? part.image_url : part.image_url?.url) ||
+    (typeof part.audio_url === 'string' ? part.audio_url : part.audio_url?.url) ||
+    (typeof part.video_url === 'string' ? part.video_url : part.video_url?.url) ||
+    (typeof part.file_url === 'string' ? part.file_url : part.file_url?.url) ||
+    (typeof part.document_url === 'string' ? part.document_url : part.document_url?.url) ||
+    (typeof part.url === 'string' ? part.url : undefined);
+
+  if (typeof rawUrl === 'string') {
+    const parsed = parseDataUri(rawUrl);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Derives a deterministic, conversation-anchored session ID for Google CloudCode PA.
  * Produces a stable negative numeric string (e.g. `-${hashNumber}`) so consecutive turns
  * within the same conversation reuse the exact same session identity instead of churning
@@ -450,38 +590,16 @@ export function transformOpenAIToAntigravity(
           continue;
         }
 
-        // 2. Multimodal image part
-        const isImage = part.type === 'image_url' || part.type === 'image';
-        if (isImage) {
-          // Anthropic base64 format: { type: 'image', source: { type: 'base64', media_type: 'image/png', data: '...' } }
-          if (part.source?.type === 'base64' && typeof part.source?.data === 'string') {
-            const rawData = part.source.data.replace(/\s+/g, '');
-            if (rawData) {
-              const mimeType = (part.source.media_type || 'image/png').toLowerCase();
-              parts.push({
-                inlineData: { mimeType, data: rawData },
-              });
-              continue;
-            }
-          }
-
-          // OpenAI format: { type: 'image_url', image_url: { url: '...' } } or { url: '...' } or image_url: '...'
-          const rawUrl = typeof part.image_url === 'string'
-            ? part.image_url
-            : (part.image_url?.url || part.url);
-
-          if (typeof rawUrl === 'string') {
-            const parsed = parseDataUri(rawUrl);
-            if (parsed) {
-              // Convert to Google CloudCode PA / Gemini wire format (strictly camelCase inlineData)
-              parts.push({
-                inlineData: {
-                  mimeType: parsed.mimeType,
-                  data: parsed.data,
-                },
-              });
-            }
-          }
+        // 2. Multimodal media part (Audio, Video, Images, PDF Documents)
+        const media = extractMultimodalInlineData(part);
+        if (media) {
+          parts.push({
+            inlineData: {
+              mimeType: media.mimeType,
+              data: media.data,
+            },
+          });
+          continue;
         }
       }
     }

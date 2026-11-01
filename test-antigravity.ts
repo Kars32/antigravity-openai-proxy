@@ -427,7 +427,117 @@ async function runAsyncTests() {
   assert.strictEqual(isBannedAccount('Account 1'), false, 'Generic account label must not be flagged');
   console.log('✓ Test 16: Banned accounts filter & pattern recognition passed');
 
-  console.log('\nAll 16 test suites passed successfully!');
+  // Test 17: Multimodal audio ingestion (OpenAI input_audio & audio_url)
+  const { extractMultimodalInlineData, normalizeMimeType } = await import('./lib/antigravity');
+  const audioPart1 = { type: 'input_audio', input_audio: { data: 'UklGRiQAAABXQVZFZ...', format: 'wav' } };
+  const audioPart2 = { type: 'audio_url', audio_url: { url: 'data:audio/mp3;base64,//uQxAAAAANIAAAAA...' } };
+  const parsedAudio1 = extractMultimodalInlineData(audioPart1);
+  const parsedAudio2 = extractMultimodalInlineData(audioPart2);
+  assert.ok(parsedAudio1, 'OpenAI input_audio should be parsed');
+  assert.strictEqual(parsedAudio1?.mimeType, 'audio/wav');
+  assert.strictEqual(parsedAudio1?.data, 'UklGRiQAAABXQVZFZ...');
+  assert.ok(parsedAudio2, 'audio_url data URI should be parsed');
+  assert.strictEqual(parsedAudio2?.mimeType, 'audio/mp3');
+  assert.strictEqual(parsedAudio2?.data, '//uQxAAAAANIAAAAA...');
+  console.log('✓ Test 17: Multimodal audio ingestion passed');
+
+  // Test 18: Multimodal video ingestion (video_url & Anthropic source)
+  const videoPart1 = { type: 'video_url', video_url: { url: 'data:video/mp4;base64,AAAAHGZ0eXBtcDQy...' } };
+  const videoPart2 = { type: 'video', source: { type: 'base64', media_type: 'video/webm', data: 'GkXfo59ChoEBQveBAUL...' } };
+  const parsedVideo1 = extractMultimodalInlineData(videoPart1);
+  const parsedVideo2 = extractMultimodalInlineData(videoPart2);
+  assert.ok(parsedVideo1, 'video_url data URI should be parsed');
+  assert.strictEqual(parsedVideo1?.mimeType, 'video/mp4');
+  assert.strictEqual(parsedVideo1?.data, 'AAAAHGZ0eXBtcDQy...');
+  assert.ok(parsedVideo2, 'Anthropic video source should be parsed');
+  assert.strictEqual(parsedVideo2?.mimeType, 'video/webm');
+  assert.strictEqual(parsedVideo2?.data, 'GkXfo59ChoEBQveBAUL...');
+  console.log('✓ Test 18: Multimodal video ingestion passed');
+
+  // Test 19: Multimodal document ingestion (Anthropic PDF & file payload)
+  const docPart = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERi0xLjQK...' } };
+  const parsedDoc = extractMultimodalInlineData(docPart);
+  assert.ok(parsedDoc, 'Anthropic PDF document should be parsed');
+  assert.strictEqual(parsedDoc?.mimeType, 'application/pdf');
+  assert.strictEqual(parsedDoc?.data, 'JVBERi0xLjQK...');
+  console.log('✓ Test 19: Multimodal document ingestion passed');
+
+  // Test 20: Unified native multimodal + Google Search grounding in single model (gemini-3.8-flash-search)
+  const { resolveModel } = await import('./lib/models');
+  const resolvedSearch = resolveModel('gemini-3.8-flash-search');
+  assert.ok(resolvedSearch, 'gemini-3.8-flash-search must resolve');
+  assert.strictEqual(resolvedSearch?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedSearch?.isWebSearch, true);
+
+  const mixedTurnWire = transformOpenAIToAntigravity(
+    {
+      model: 'gemini-3.8-flash-search',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analyze this video clip and audio commentary with current web facts.' },
+            audioPart1,
+            videoPart1,
+            { type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgo...' } }
+          ]
+        }
+      ]
+    },
+    resolvedSearch!,
+    'test-proj'
+  );
+
+  assert.strictEqual(mixedTurnWire.model, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(mixedTurnWire.request.contents[0].parts.length, 4);
+  assert.strictEqual(mixedTurnWire.request.contents[0].parts[0].text, 'Analyze this video clip and audio commentary with current web facts.');
+  assert.strictEqual(mixedTurnWire.request.contents[0].parts[1].inlineData.mimeType, 'audio/wav');
+  assert.strictEqual(mixedTurnWire.request.contents[0].parts[2].inlineData.mimeType, 'video/mp4');
+  assert.strictEqual(mixedTurnWire.request.contents[0].parts[3].inlineData.mimeType, 'image/png');
+  assert.deepStrictEqual(mixedTurnWire.request.tools, [{ googleSearch: {} }], 'Google Search tool must be present alongside multimodal data');
+  console.log('✓ Test 20: Unified native multimodal + Google Search grounding in single model passed');
+
+  // Test 21: gemini-3.8-flash-high-search and typo tolerance gemin-3.8-flash-high-search
+  const resolvedHighSearch = resolveModel('gemini-3.8-flash-high-search');
+  const resolvedTypoHighSearch = resolveModel('gemin-3.8-flash-high-search');
+  assert.ok(resolvedHighSearch, 'gemini-3.8-flash-high-search must resolve');
+  assert.strictEqual(resolvedHighSearch?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedHighSearch?.defaultThinkingBudget, 24576);
+  assert.strictEqual(resolvedHighSearch?.isWebSearch, true);
+
+  assert.ok(resolvedTypoHighSearch, 'gemin-3.8-flash-high-search typo must resolve seamlessly');
+  assert.strictEqual(resolvedTypoHighSearch?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedTypoHighSearch?.defaultThinkingBudget, 24576);
+  assert.strictEqual(resolvedTypoHighSearch?.isWebSearch, true);
+
+  const highSearchWire = transformOpenAIToAntigravity(
+    {
+      model: 'gemini-3.8-flash-high-search',
+      messages: [{ role: 'user', content: 'Deep search query' }]
+    },
+    resolvedHighSearch!,
+    'test-proj'
+  );
+  assert.strictEqual(highSearchWire.request.generationConfig.thinkingConfig.thinkingBudget, 24576);
+  assert.deepStrictEqual(highSearchWire.request.tools, [{ googleSearch: {} }]);
+  console.log('✓ Test 21: gemini-3.8-flash-high-search and typo tolerance passed');
+
+  // Test 22: Redundant multimodal suffixes map directly to unified model without model fragmentation
+  const resolvedVision = resolveModel('gemini-3.8-flash-vision');
+  const resolvedOmni = resolveModel('gemini-3.8-flash-omni');
+  const resolvedSearchVision = resolveModel('gemini-3.8-flash-search-vision');
+  const resolvedHighVisionSearch = resolveModel('gemini-3.8-flash-high-vision-search');
+
+  assert.strictEqual(resolvedVision?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedOmni?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedSearchVision?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedSearchVision?.isWebSearch, true);
+  assert.strictEqual(resolvedHighVisionSearch?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(resolvedHighVisionSearch?.defaultThinkingBudget, 24576);
+  assert.strictEqual(resolvedHighVisionSearch?.isWebSearch, true);
+  console.log('✓ Test 22: Redundant multimodal suffix consolidation passed');
+
+  console.log('\nAll 22 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

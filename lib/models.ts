@@ -30,7 +30,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (High)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 24576,
-    description: "Google's next-gen flagship hybrid reasoning model with high thinking budget.",
+    description: "Google's next-gen flagship hybrid reasoning model with high thinking budget and native audio, video, image, and document understanding.",
     tier: "High",
     speed: "Fast",
     contextWindow: 1048576,
@@ -40,7 +40,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Medium)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 8192,
-    description: "Balanced multimodal and coding reasoning on Gemini 3.8.",
+    description: "Balanced multimodal (audio, video, image, document) and coding reasoning on Gemini 3.8.",
     tier: "Medium",
     speed: "Fast",
     contextWindow: 1048576,
@@ -50,7 +50,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Low)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 2048,
-    description: "Snappy conversational reasoning tier on Gemini 3.8.",
+    description: "Snappy conversational reasoning tier with native audio, video, image, and document understanding.",
     tier: "Low",
     speed: "Fast",
     contextWindow: 1048576,
@@ -60,7 +60,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Fast)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 0,
-    description: "Zero-thinking ultra-low latency generation for fast coding tool loops.",
+    description: "Zero-thinking ultra-low latency generation with native audio, video, image, and document understanding.",
     tier: "Fast",
     speed: "Ultra-Fast",
     contextWindow: 1048576,
@@ -70,7 +70,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 8192,
-    description: "Standard Gemini 3.8 Flash flagship model.",
+    description: "Standard Gemini 3.8 Flash flagship model with native audio, video, image, and document understanding.",
     tier: "Standard",
     speed: "Fast",
     contextWindow: 1048576,
@@ -80,7 +80,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Max)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 65536,
-    description: "Maximum reasoning budget (64K tokens) for deep architectural planning.",
+    description: "Maximum reasoning budget (64K tokens) for deep architectural planning with native audio, video, image, and document understanding.",
     tier: "Max",
     speed: "Deep",
     contextWindow: 1048576,
@@ -242,7 +242,27 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Search)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 8192,
-    description: "Gemini 3.8 Flash flagship model with native Google Search grounding.",
+    description: "Gemini 3.8 Flash flagship model with native Google Search grounding, audio, video, image, and document understanding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-high-search",
+    name: "Gemini 3.8 Flash High (Search)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 24576,
+    description: "Gemini 3.8 Flash High reasoning model with native Google Search grounding, audio, video, image, and document understanding.",
+    tier: "Search",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-3.8-flash-high-web",
+    name: "Gemini 3.8 Flash High (Web)",
+    wireModel: "gemini-3.8-flash-tiered",
+    defaultThinkingBudget: 24576,
+    description: "Gemini 3.8 Flash High with native web search grounding, audio, video, image, and document understanding.",
     tier: "Search",
     speed: "Fast",
     contextWindow: 1048576,
@@ -252,7 +272,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     name: "Gemini 3.8 Flash (Web)",
     wireModel: "gemini-3.8-flash-tiered",
     defaultThinkingBudget: 8192,
-    description: "Gemini 3.8 Flash with native web search grounding.",
+    description: "Gemini 3.8 Flash with native web search grounding, audio, video, image, and document understanding.",
     tier: "Search",
     speed: "Fast",
     contextWindow: 1048576,
@@ -341,7 +361,21 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
 
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
   if (!modelId) return null;
-  const clean = modelId.trim().toLowerCase();
+  let clean = modelId.trim().toLowerCase();
+
+  // Normalize common client prefix typos (e.g. gemin- -> gemini-)
+  if (clean.startsWith('gemin-')) {
+    clean = 'gemini-' + clean.slice(6);
+  }
+
+  // Strip redundant multimodal suffixes: Gemini 3.8 models natively understand audio, video, image,
+  // and documents within the unified model without requiring separate fragmented endpoints.
+  for (const suffix of ['-vision', ':vision', '-multimodal', ':multimodal', '-omni', ':omni', '-audio', ':audio', '-video', ':video']) {
+    if (clean.endsWith(suffix)) {
+      clean = clean.slice(0, -suffix.length);
+      break;
+    }
+  }
 
   // Search suffix detection (:search, -search, :web, -web)
   let isWebSearch = false;
@@ -358,6 +392,14 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   } else if (baseClean.endsWith('-web')) {
     isWebSearch = true;
     baseClean = baseClean.slice(0, -4);
+  }
+
+  // Strip multimodal suffixes from baseClean as well (handles patterns like gemini-3.8-flash-vision-search)
+  for (const suffix of ['-vision', ':vision', '-multimodal', ':multimodal', '-omni', ':omni', '-audio', ':audio', '-video', ':video']) {
+    if (baseClean.endsWith(suffix)) {
+      baseClean = baseClean.slice(0, -suffix.length);
+      break;
+    }
   }
 
   // Exact ID match

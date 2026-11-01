@@ -79,7 +79,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     id: "gemini-3.8-flash-max",
     name: "Gemini 3.8 Flash (Max)",
     wireModel: "gemini-3.8-flash-tiered",
-    defaultThinkingBudget: 65536,
+    defaultThinkingBudget: 65535,
     description: "Maximum reasoning budget (64K tokens) for deep architectural planning with native audio, video, image, and document understanding.",
     tier: "Max",
     speed: "Deep",
@@ -141,7 +141,7 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     id: "gemini-3.7-flash-max",
     name: "Gemini 3.7 Flash (Max)",
     wireModel: "gemini-3.7-flash-tiered",
-    defaultThinkingBudget: 65536,
+    defaultThinkingBudget: 65535,
     description: "Maximum reasoning budget (64K tokens) for deep architectural planning.",
     tier: "Max",
     speed: "Deep",
@@ -426,7 +426,7 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
 
   // Gemini 3.8 Flash variants (high, max, medium/mid, low, fast/off)
   if (clean === 'gemini-3.8-flash-max' || clean === 'gemini-3.8-flash:max' || clean === 'gemini-3.8-flash-xhigh') {
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65536 };
+    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 65535 };
   }
   if (clean === 'gemini-3.8-flash-high' || clean === 'gemini-3.8-flash:high') {
     return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 24576 };
@@ -443,7 +443,7 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
 
   // Gemini 3.7 Flash variants (high, max, medium/mid, low, fast/off)
   if (clean === 'gemini-3.7-flash-max' || clean === 'gemini-3.7-flash:max' || clean === 'gemini-3.7-flash-xhigh') {
-    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65536 };
+    return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 65535 };
   }
   if (clean === 'gemini-3.7-flash-high' || clean === 'gemini-3.7-flash:high') {
     return { wireModel: 'gemini-3.7-flash-tiered', defaultThinkingBudget: 24576 };

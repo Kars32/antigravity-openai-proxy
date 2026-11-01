@@ -621,7 +621,7 @@ export function transformOpenAIToAntigravity(
   const modelClean = (body.model || '').toLowerCase();
 
   if (modelClean.includes(':max') || modelClean.includes('-max') || body.reasoning_effort === 'max') {
-    thinkingBudget = 65536;
+    thinkingBudget = 65535;
   } else if (modelClean.includes(':high') || modelClean.includes('-high') || body.reasoning_effort === 'high') {
     thinkingBudget = 24576;
   } else if (modelClean.includes(':low') || modelClean.includes('-low') || body.reasoning_effort === 'low') {
@@ -632,6 +632,11 @@ export function transformOpenAIToAntigravity(
     thinkingBudget = body.thinking_budget;
   } else if (body.thinking?.budget_tokens) {
     thinkingBudget = body.thinking.budget_tokens;
+  }
+
+  // Google CloudCode PA strictly enforces thinking_budget in range [-1, 65535]
+  if (thinkingBudget > 65535) {
+    thinkingBudget = 65535;
   }
 
   const clientMaxTokens = typeof body.max_tokens === 'number' && body.max_tokens > 0

@@ -427,7 +427,29 @@ async function runAsyncTests() {
   assert.strictEqual(isBannedAccount('Account 1'), false, 'Generic account label must not be flagged');
   console.log('✓ Test 16: Banned accounts filter & pattern recognition passed');
 
-  console.log('\nAll 16 test suites passed successfully!');
+  // Test 17: Precomputed OPENAI_MODELS_LIST integrity and ownership correctness
+  const { OPENAI_MODELS_LIST, SUPPORTED_MODELS } = await import('./lib/models');
+  const { OPENCODE_MODELS } = await import('./lib/opencode');
+  const opencodeSet = new Set(OPENCODE_MODELS.map(m => m.id));
+
+  assert.strictEqual(OPENAI_MODELS_LIST.length, SUPPORTED_MODELS.length, 'OPENAI_MODELS_LIST length must match SUPPORTED_MODELS length');
+  assert.ok(Object.isFrozen(OPENAI_MODELS_LIST), 'OPENAI_MODELS_LIST must be frozen against mutations');
+
+  for (let i = 0; i < SUPPORTED_MODELS.length; i++) {
+    const raw = SUPPORTED_MODELS[i];
+    const item = OPENAI_MODELS_LIST[i];
+    assert.strictEqual(item.id, raw.id);
+    assert.strictEqual(item.object, 'model');
+    assert.strictEqual(item.created, 1700000000);
+    assert.strictEqual(item.root, raw.wireModel);
+    assert.strictEqual(item.parent, null);
+    assert.deepStrictEqual(item.permission, []);
+    const expectedOwner = opencodeSet.has(raw.id) ? 'opencode' : 'google-antigravity';
+    assert.strictEqual(item.owned_by, expectedOwner, `owned_by mismatch for ${raw.id}`);
+  }
+  console.log('✓ Test 17: Precomputed OPENAI_MODELS_LIST schema and ownership integrity passed');
+
+  console.log('\nAll 17 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

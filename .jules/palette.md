@@ -1,0 +1,3 @@
+## 2025-05-18 - Accessible Secret Key / Password Inputs on Minimalist Lock Screens
+**Learning:** Minimalist gatekeeper / lock screens frequently mask long alphanumeric API keys by default as passwords. When pasting or typing complex keys, users cannot easily detect trailing whitespace or character typos without an explicit toggle. Additionally, pairing the input with explicit label association (`htmlFor` / `id`), `aria-invalid`, and error messages with `role="alert"` ensures screen reader users receive immediate validation feedback.
+**Action:** Always provide an accessible show/hide toggle with dynamic `aria-label` and `title`, explicit label association, and link error banners to input fields using `aria-describedby` and `role="alert"`.

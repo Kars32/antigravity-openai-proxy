@@ -537,7 +537,30 @@ async function runAsyncTests() {
   assert.strictEqual(resolvedHighVisionSearch?.isWebSearch, true);
   console.log('✓ Test 22: Redundant multimodal suffix consolidation passed');
 
-  console.log('\nAll 22 test suites passed successfully!');
+  // Test 23: Precomputed OPENAI_MODELS_LIST integrity and performance optimization
+  const { OPENAI_MODELS_LIST, SUPPORTED_MODELS } = await import('./lib/models');
+  const { OPENCODE_MODELS } = await import('./lib/opencode');
+
+  assert.strictEqual(OPENAI_MODELS_LIST.length, SUPPORTED_MODELS.length, 'OPENAI_MODELS_LIST must match SUPPORTED_MODELS length');
+  assert.ok(Object.isFrozen(OPENAI_MODELS_LIST), 'OPENAI_MODELS_LIST must be frozen');
+
+  const opencodeIdSet = new Set(OPENCODE_MODELS.map(om => om.id));
+  for (let i = 0; i < OPENAI_MODELS_LIST.length; i++) {
+    const item = OPENAI_MODELS_LIST[i];
+    const spec = SUPPORTED_MODELS[i];
+    assert.strictEqual(item.id, spec.id);
+    assert.strictEqual(item.object, 'model');
+    assert.strictEqual(item.created, 1700000000);
+    assert.strictEqual(item.root, spec.wireModel);
+    assert.strictEqual(item.parent, null);
+    assert.deepStrictEqual(item.permission, []);
+    const expectedOwner = opencodeIdSet.has(spec.id) ? 'opencode' : 'google-antigravity';
+    assert.strictEqual(item.owned_by, expectedOwner);
+    assert.ok(Object.isFrozen(item), 'Each model descriptor in OPENAI_MODELS_LIST must be frozen');
+  }
+  console.log('✓ Test 23: Precomputed OPENAI_MODELS_LIST integrity passed');
+
+  console.log('\nAll 23 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

@@ -9,6 +9,7 @@ export default function AntigravityOpenAIControlCenter() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loginKeyInput, setLoginKeyInput] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -227,19 +228,45 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
-              <input
-                type="password"
-                placeholder="KARS-..."
-                value={loginKeyInput}
-                onChange={(e) => setLoginKeyInput(e.target.value)}
-                style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: '10px 14px', color: '#f4f4f5', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                autoFocus
-              />
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>
+                Master Proxy Key
+              </label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  id="master-key-input"
+                  name="masterKey"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="KARS-..."
+                  value={loginKeyInput}
+                  onChange={(e) => setLoginKeyInput(e.target.value)}
+                  aria-describedby={loginError ? 'login-error-msg' : undefined}
+                  style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: '10px 42px 10px 14px', color: '#f4f4f5', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide master proxy key' : 'Show master proxy key'}
+                  style={{ position: 'absolute', right: 8, background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}
+                >
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {loginError && (
-              <div style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
+              <div id="login-error-msg" role="alert" style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
                 {loginError}
               </div>
             )}

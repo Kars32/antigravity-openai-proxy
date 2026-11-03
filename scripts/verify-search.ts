@@ -29,15 +29,12 @@ import { transformOpenAIToAntigravity } from '../lib/antigravity';
 async function main() {
   console.log('🧪 RUNNING ANTIGRAVITY OPENAI PROXY WEB SEARCH VERIFICATION\n');
 
-  // Test 1: Model Catalog Registration
+  // Test 1: Model Catalog Registration (Decluttered Catalog)
   console.log('Test 1: Model Catalog Registration');
   const requiredSearchModels = [
     'gemini-3.8-flash-search',
-    'gemini-3.8-flash-web',
-    'gemini-3.7-flash-search',
-    'gemini-3.7-flash-web',
-    'gemini-3.1-pro-search',
-    'gemini-3.1-pro-web',
+    'gemini-3.8-flash-high-search',
+    'opus-4.6-search',
   ];
 
   for (const modelId of requiredSearchModels) {
@@ -45,18 +42,18 @@ async function main() {
     assert.ok(found, `Model ${modelId} must be registered in SUPPORTED_MODELS`);
     assert.strictEqual(found.tier, 'Search');
   }
-  console.log('✅ All search models successfully registered in SUPPORTED_MODELS.\n');
+  console.log('✅ All active search models successfully registered in SUPPORTED_MODELS.\n');
 
-  // Test 2: Model Name & Suffix Resolution
+  // Test 2: Model Name & Suffix Resolution (including transparent legacy aliases)
   console.log('Test 2: Model Name & Suffix Resolution');
   const testCases = [
     { input: 'gemini-3.8-flash-search', wire: 'gemini-3.8-flash-tiered', budget: 8192, search: true },
     { input: 'gemini-3.8-flash:search', wire: 'gemini-3.8-flash-tiered', budget: 8192, search: true },
     { input: 'gemini-3.8-flash-web', wire: 'gemini-3.8-flash-tiered', budget: 8192, search: true },
     { input: 'gemini-3.8-flash:web', wire: 'gemini-3.8-flash-tiered', budget: 8192, search: true },
-    { input: 'gemini-3.7-flash-search', wire: 'gemini-3.7-flash-tiered', budget: 8192, search: true },
-    { input: 'gemini-3.1-pro-search', wire: 'gemini-pro-agent', budget: 32768, search: true },
-    { input: 'gemini-3.1-pro:search', wire: 'gemini-pro-agent', budget: 32768, search: true },
+    { input: 'gemini-3.7-flash-search', wire: 'gemini-3.8-flash-tiered', budget: 8192, search: true },
+    { input: 'gemini-3.1-pro-search', wire: 'gemini-3.8-flash-tiered', budget: 24576, search: true },
+    { input: 'gemini-3.1-pro:search', wire: 'gemini-3.8-flash-tiered', budget: 24576, search: true },
     { input: 'gemini-3.8-flash-high-search', wire: 'gemini-3.8-flash-tiered', budget: 24576, search: true },
   ];
 

@@ -51,13 +51,12 @@ export function getAntigravityHeaders(accessToken?: string, accept: string = 'te
   return headers;
 }
 
-export const BANNED_ACCOUNTS = new Set(['kars86120@gmail.com', 'kars86120']);
+export const BANNED_ACCOUNTS = new Set<string>();
 
 export function isBannedAccount(name: string): boolean {
   const clean = (name || '').toLowerCase().trim();
   if (!clean) return false;
   if (BANNED_ACCOUNTS.has(clean)) return true;
-  if (clean.includes('kars86120')) return true;
   return false;
 }
 

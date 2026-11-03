@@ -417,15 +417,12 @@ async function runAsyncTests() {
   assert.strictEqual(fallbackWire.project, 'aicode-consumers', 'Empty projectId must safely fallback to aicode-consumers without cross-account contamination');
   console.log('✓ Test 15: Safe project isolation fallback passed');
 
-  // Test 16: Banned accounts filter & robust pattern recognition
-  assert.ok(isBannedAccount('kars86120@gmail.com'), 'kars86120@gmail.com must be identified as banned');
-  assert.ok(isBannedAccount('kars86120'), 'kars86120 must be identified as banned');
-  assert.ok(isBannedAccount('KARS86120@GMAIL.COM'), 'Case-insensitive banned check must succeed');
-  assert.ok(isBannedAccount('kars86120 (Account 3)'), 'Substring match with label must be identified as banned');
-  assert.ok(isBannedAccount('kars86120@googlemail.com'), 'Variant domain must be identified as banned');
+  // Test 16: Account validation & unbanned kars86120 verification
+  assert.strictEqual(isBannedAccount('kars86120@gmail.com'), false, 'kars86120@gmail.com must be unbanned and permitted');
+  assert.strictEqual(isBannedAccount('kars86120'), false, 'kars86120 must be unbanned and permitted');
   assert.strictEqual(isBannedAccount('yashv3050@gmail.com'), false, 'Legitimate account must not be flagged');
   assert.strictEqual(isBannedAccount('Account 1'), false, 'Generic account label must not be flagged');
-  console.log('✓ Test 16: Banned accounts filter & pattern recognition passed');
+  console.log('✓ Test 16: Account validation & unbanned kars86120 verified');
 
   // Test 17: Multimodal audio ingestion (OpenAI input_audio & audio_url)
   const { extractMultimodalInlineData, normalizeMimeType } = await import('./lib/antigravity');
@@ -537,7 +534,65 @@ async function runAsyncTests() {
   assert.strictEqual(resolvedHighVisionSearch?.isWebSearch, true);
   console.log('✓ Test 22: Redundant multimodal suffix consolidation passed');
 
-  console.log('\nAll 22 test suites passed successfully!');
+  // Test 23: Decluttered model catalog has exactly 12 verified models
+  const { SUPPORTED_MODELS } = await import('./lib/models');
+  assert.strictEqual(SUPPORTED_MODELS.length, 12, 'SUPPORTED_MODELS must contain exactly 12 verified models');
+  const expectedModelIds = [
+    'gemini-3.1-flash-image',
+    'gemini-3.8-flash',
+    'gemini-3.8-flash-high',
+    'gemini-3.8-flash-max',
+    'gemini-3.8-flash-medium',
+    'gemini-3.8-flash-low',
+    'gemini-3.8-flash-fast',
+    'gemini-3.8-flash-search',
+    'gemini-3.8-flash-high-search',
+    'claude-sonnet-4-6',
+    'claude-opus-4-6-thinking',
+    'opus-4.6-search',
+  ];
+  for (const id of expectedModelIds) {
+    assert.ok(SUPPORTED_MODELS.some(m => m.id === id), `Catalog must contain model ${id}`);
+  }
+  console.log('✓ Test 23: Decluttered model catalog (12 verified models) passed');
+
+  // Test 24: Legacy model IDs transparently resolve with zero-breakage backward compatibility
+  const legacy37 = resolveModel('gemini-3.7-flash');
+  assert.strictEqual(legacy37?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacy37?.defaultThinkingBudget, 8192);
+
+  const legacy37High = resolveModel('gemini-3.7-flash-high');
+  assert.strictEqual(legacy37High?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacy37High?.defaultThinkingBudget, 24576);
+
+  const legacyGpt4o = resolveModel('gpt-4o');
+  assert.strictEqual(legacyGpt4o?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacyGpt4o?.defaultThinkingBudget, 8192);
+
+  const legacyGpt4oMini = resolveModel('gpt-4o-mini');
+  assert.strictEqual(legacyGpt4oMini?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacyGpt4oMini?.defaultThinkingBudget, 2048);
+
+  const legacyOpusSearch = resolveModel('claude-opus-4-6-search');
+  assert.strictEqual(legacyOpusSearch?.wireModel, 'claude-opus-4-6-thinking');
+  assert.strictEqual(legacyOpusSearch?.isWebSearch, true);
+
+  const legacyOpenCode = resolveModel('big-pickle');
+  assert.strictEqual(legacyOpenCode?.wireModel, 'gemini-3.8-flash-tiered');
+
+  // Test 25: Legacy Pro and Flash models alias verification
+  const legacyPro = resolveModel('gemini-3.1-pro');
+  assert.strictEqual(legacyPro?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacyPro?.defaultThinkingBudget, 24576);
+
+  const legacyFlash25 = resolveModel('gemini-2.5-flash');
+  assert.strictEqual(legacyFlash25?.wireModel, 'gemini-3.8-flash-tiered');
+  assert.strictEqual(legacyFlash25?.defaultThinkingBudget, 0);
+
+  console.log('✓ Test 24: Legacy model alias resolution passed');
+  console.log('✓ Test 25: Legacy Pro and Flash models alias verification passed');
+
+  console.log('\nAll 25 test suites passed successfully!');
 }
 
 runAsyncTests().catch(err => {

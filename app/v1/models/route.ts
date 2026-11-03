@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SUPPORTED_MODELS } from '@/lib/models';
-import { OPENCODE_MODELS } from '@/lib/opencode';
 import { checkAuth, handleOptions } from '@/lib/completions';
 
 export const runtime = 'nodejs';
@@ -22,7 +21,7 @@ export async function GET(req: NextRequest) {
     id: m.id,
     object: 'model',
     created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
+    owned_by: m.id.startsWith('claude') || m.id.startsWith('opus') ? 'anthropic' : 'google-antigravity',
     permission: [],
     root: m.wireModel,
     parent: null,

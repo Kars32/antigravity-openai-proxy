@@ -1,0 +1,5 @@
+# Palette UX & Accessibility Journal
+
+## 2025-05-18 - Developer Playground Prompt Submission & Accessible Form Linkage
+**Learning:** In developer-facing interactive testing consoles (like LLM playground interfaces), users instinctively expect `⌘ + Enter` / `Ctrl + Enter` to trigger model execution directly from the multiline prompt `<textarea>`. Without this shortcut and without visual shortcut discoverability (`<kbd>`), users face high interaction friction having to leave the keyboard to click the submit button. Additionally, dynamic LLM output streaming needs `role="region"` and `aria-live="polite"` so screen readers are informed when tokens stream into the output buffer without interrupting other speech.
+**Action:** When designing or updating developer consoles with prompt textareas, always wire up `(e.ctrlKey || e.metaKey) && e.key === 'Enter'`, display a visible `<kbd>` shortcut badge near the label, link `<label htmlFor>` to element `id`s, and wrap streaming output in an `aria-live="polite"` region.

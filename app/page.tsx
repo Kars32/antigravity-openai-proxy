@@ -227,19 +227,21 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
               <input
+                id="master-key-input"
                 type="password"
                 placeholder="KARS-..."
                 value={loginKeyInput}
                 onChange={(e) => setLoginKeyInput(e.target.value)}
+                aria-describedby={loginError ? 'login-error-msg' : undefined}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: '10px 14px', color: '#f4f4f5', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                 autoFocus
               />
             </div>
 
             {loginError && (
-              <div style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
+              <div id="login-error-msg" role="alert" style={{ fontSize: 12, color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '8px 12px', borderRadius: 6, marginBottom: 16 }}>
                 {loginError}
               </div>
             )}
@@ -564,8 +566,9 @@ for await (const chunk of stream) {
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="test-model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="test-model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,11 +618,21 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label htmlFor="test-prompt-input" style={{ fontSize: 12, color: '#a1a1aa' }}>Prompt</label>
+                <span style={{ fontSize: 11, color: '#71717a' }}>Press <kbd style={{ padding: '1px 5px', borderRadius: 4, backgroundColor: '#18181b', border: '1px solid #27272a', fontSize: 10, color: '#a1a1aa' }}>Ctrl+↵</kbd> to run</span>
+              </div>
               <textarea
+                id="test-prompt-input"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isTesting) {
+                    e.preventDefault();
+                    handleSendTest();
+                  }
+                }}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '10px 12px', color: '#f4f4f5', fontSize: 13, boxSizing: 'border-box', resize: 'vertical' }}
               />
             </div>
@@ -627,6 +640,7 @@ for await (const chunk of stream) {
             <button
               onClick={handleSendTest}
               disabled={isTesting}
+              aria-label="Send Completion Request"
               style={{
                 width: '100%',
                 backgroundColor: isTesting ? '#27272a' : '#ffffff',

@@ -135,7 +135,7 @@ export async function handleChatCompletions(req: NextRequest) {
     return NextResponse.json(
       {
         error: {
-          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.8-flash, gemini-3.8-flash-search, gemini-3.7-flash, gemini-3.7-flash-search, gemini-3.1-pro, gemini-3.1-pro-search, big-pickle, big-pickle-fast, mimo-v2.5-free, mimo-v2.5-free-fast, ling-3.0-flash-fin-free, ling-3.0-flash-fin-free-fast, nemotron-3-ultra-free, nemotron-3-ultra-free-fast, nemotron-3.5-lightning-free, nemotron-3.5-lightning-free-fast.`,
+          message: `[Model Not Found]: '${modelId}' is not a valid or supported model on Antigravity Proxy. Supported models include: gemini-3.8-flash, gemini-3.8-flash-search, gemini-3.7-flash, gemini-3.7-flash-search, gemini-3.1-pro, gemini-3.1-pro-search, claude-sonnet-4-6, claude-opus-4-6-thinking, big-pickle, big-pickle-fast, beam-free, beam-free-fast, flint-40b-free, flint-40b-free-fast, mimo-v2.6-flash-free, mimo-v2.6-flash-free-fast, nemotron-3.5-super-vl-free, nemotron-3.5-super-vl-free-fast, nemotron-3.5-lightning-free, nemotron-3.5-lightning-free-fast, deepseek-v4.1-flash-free, deepseek-v4.1-flash-free-fast, glm-5.3-flash-free, glm-5.3-flash-free-fast, iceman-free, iceman-free-fast, inkling-2-small-free, inkling-2-small-free-fast.`,
           type: 'invalid_request_error',
           param: 'model',
           code: 'model_not_found',

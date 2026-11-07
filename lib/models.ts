@@ -9,7 +9,9 @@ export interface ModelSpec {
   contextWindow: number;
 }
 
-export const SUPPORTED_MODELS: ModelSpec[] = [
+import { OPENCODE_MODELS, resolveOpenCodeModel } from './opencode';
+
+export const GOOGLE_SUPPORTED_MODELS: ModelSpec[] = [
   // 0. Image Generation (Native Multimodal Image Wire Model)
   {
     id: "gemini-3.1-flash-image",
@@ -138,6 +140,19 @@ export const SUPPORTED_MODELS: ModelSpec[] = [
     contextWindow: 1048576,
   },
 ];
+
+export const OPENCODE_MODEL_SPECS: ModelSpec[] = OPENCODE_MODELS.map((m) => ({
+  id: m.id,
+  name: m.name,
+  wireModel: m.wireModel,
+  defaultThinkingBudget: m.defaultThinkingBudget,
+  description: m.description,
+  tier: m.tier,
+  speed: m.speed,
+  contextWindow: m.contextWindow,
+}));
+
+export const SUPPORTED_MODELS: ModelSpec[] = [...GOOGLE_SUPPORTED_MODELS, ...OPENCODE_MODEL_SPECS];
 
 export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
   if (!modelId) return null;
@@ -294,10 +309,13 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
     return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: 2048 };
   }
 
-  // OpenCode free models fallback to 3.8 Flash
-  if (clean.startsWith('big-pickle') || clean.startsWith('mimo') || clean.startsWith('ling') || clean.startsWith('nemotron')) {
-    const isFast = clean.endsWith('-fast') || clean.endsWith(':fast') || clean.endsWith('-off');
-    return { wireModel: 'gemini-3.8-flash-tiered', defaultThinkingBudget: isFast ? 0 : 8192 };
+  // OpenCode models resolution (including active models, -fast variants, and deprecated aliases like mimo-v2.5-free)
+  const openCodeResolved = resolveOpenCodeModel(clean);
+  if (openCodeResolved) {
+    return {
+      wireModel: openCodeResolved.wireModel,
+      defaultThinkingBudget: openCodeResolved.isFast ? 0 : 8192,
+    };
   }
 
   // Google internal wire format pass-through

@@ -22,7 +22,11 @@ export async function GET(req: NextRequest) {
     id: m.id,
     object: 'model',
     created: 1700000000,
-    owned_by: OPENCODE_MODELS.some(om => om.id === m.id) ? 'opencode' : 'google-antigravity',
+    owned_by: OPENCODE_MODELS.some(om => om.id === m.id)
+      ? 'opencode'
+      : m.id.startsWith('claude') || m.id.startsWith('opus')
+      ? 'anthropic'
+      : 'google-antigravity',
     permission: [],
     root: m.wireModel,
     parent: null,

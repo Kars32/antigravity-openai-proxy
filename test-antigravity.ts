@@ -534,9 +534,9 @@ async function runAsyncTests() {
   assert.strictEqual(resolvedHighVisionSearch?.isWebSearch, true);
   console.log('✓ Test 22: Redundant multimodal suffix consolidation passed');
 
-  // Test 23: Decluttered model catalog has exactly 12 verified models
+  // Test 23: Model catalog contains 12 Google/Claude models + 20 OpenCode models (32 total)
   const { SUPPORTED_MODELS } = await import('./lib/models');
-  assert.strictEqual(SUPPORTED_MODELS.length, 12, 'SUPPORTED_MODELS must contain exactly 12 verified models');
+  assert.strictEqual(SUPPORTED_MODELS.length, 32, 'SUPPORTED_MODELS must contain 12 Google/Claude + 20 OpenCode models (32 total)');
   const expectedModelIds = [
     'gemini-3.1-flash-image',
     'gemini-3.8-flash',
@@ -550,11 +550,21 @@ async function runAsyncTests() {
     'claude-sonnet-4-6',
     'claude-opus-4-6-thinking',
     'opus-4.6-search',
+    'big-pickle',
+    'beam-free',
+    'flint-40b-free',
+    'mimo-v2.6-flash-free',
+    'nemotron-3.5-super-vl-free',
+    'nemotron-3.5-lightning-free',
+    'deepseek-v4.1-flash-free',
+    'glm-5.3-flash-free',
+    'iceman-free',
+    'inkling-2-small-free',
   ];
   for (const id of expectedModelIds) {
     assert.ok(SUPPORTED_MODELS.some(m => m.id === id), `Catalog must contain model ${id}`);
   }
-  console.log('✓ Test 23: Decluttered model catalog (12 verified models) passed');
+  console.log('✓ Test 23: Complete model catalog (12 Google/Claude + 20 OpenCode models) passed');
 
   // Test 24: Legacy model IDs transparently resolve with zero-breakage backward compatibility
   const legacy37 = resolveModel('gemini-3.7-flash');
@@ -577,8 +587,11 @@ async function runAsyncTests() {
   assert.strictEqual(legacyOpusSearch?.wireModel, 'claude-opus-4-6-thinking');
   assert.strictEqual(legacyOpusSearch?.isWebSearch, true);
 
-  const legacyOpenCode = resolveModel('big-pickle');
-  assert.strictEqual(legacyOpenCode?.wireModel, 'gemini-3.8-flash-tiered');
+  const activeOpenCode = resolveModel('big-pickle');
+  assert.strictEqual(activeOpenCode?.wireModel, 'big-pickle');
+
+  const legacyOpenCodeAlias = resolveModel('mimo-v2.5-free');
+  assert.strictEqual(legacyOpenCodeAlias?.wireModel, 'mimo-v2.6-flash-free');
 
   // Test 25: Legacy Pro and Flash models alias verification
   const legacyPro = resolveModel('gemini-3.1-pro');

@@ -155,7 +155,36 @@ export async function handleChatCompletions(req: NextRequest) {
   }
 
   const stream = body.stream === true;
-  const accounts = getAccounts();
+  let accounts = getAccounts();
+
+  // Strictly pin models with targetAccount or isDedicatedCohort (e.g. gemini-4-argon, claude-opus-5-5, claude-sonnet-5-5)
+  // so they ONLY route through the designated account and never leak/failover to standard pool accounts.
+  if (resolved?.targetAccount || resolved?.isDedicatedCohort) {
+    const rawTarget = resolved.targetAccount || process.env.DEDICATED_COHORT_ACCOUNT || process.env.DEDICATED_COHORT_EMAIL || 'acc-8';
+    const targetLower = rawTarget.toLowerCase().trim();
+    const pinnedAccounts = accounts.filter(
+      a => a.name.toLowerCase() === targetLower ||
+           a.id.toLowerCase() === targetLower ||
+           (targetLower.startsWith('account_') && a.id.toLowerCase() === targetLower.replace('account_', 'acc-')) ||
+           (targetLower.startsWith('account_') && a.id.toLowerCase() === targetLower.replace('account_', 'acc_')) ||
+           a.id.toLowerCase() === 'acc-8' ||
+           a.id.toLowerCase() === 'acc_8' ||
+           (process.env.DEDICATED_COHORT_EMAIL && a.name.toLowerCase() === process.env.DEDICATED_COHORT_EMAIL.toLowerCase().trim())
+    );
+    if (pinnedAccounts.length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `[Dedicated Account Required]: Model '${modelId}' is exclusively available on the new dedicated account (Slot #8), which is not yet linked or configured in environment variables. Run 'npm run auth-account 8' to authorize this account.`,
+            type: 'configuration_error',
+            code: 503
+          }
+        },
+        { status: 503, headers: { 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
+    accounts = pinnedAccounts;
+  }
 
   if (accounts.length === 0) {
     return NextResponse.json(
@@ -207,10 +236,14 @@ export async function handleChatCompletions(req: NextRequest) {
   }
 
   let primaryAccount: any;
-  try {
-    primaryAccount = pickAccount();
-  } catch {
+  if (resolved?.targetAccount || resolved?.isDedicatedCohort) {
     primaryAccount = availableAccounts[0] || accounts[0];
+  } else {
+    try {
+      primaryAccount = pickAccount();
+    } catch {
+      primaryAccount = availableAccounts[0] || accounts[0];
+    }
   }
 
   const otherAccounts = accounts.filter(a => a.id !== primaryAccount?.id);

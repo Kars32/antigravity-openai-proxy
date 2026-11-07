@@ -139,6 +139,68 @@ export const GOOGLE_SUPPORTED_MODELS: ModelSpec[] = [
     speed: "Deep",
     contextWindow: 1048576,
   },
+
+  // 4. Dedicated Cohort Models (Gemini 4 Argon & Claude 5.5)
+  {
+    id: "gemini-4-argon",
+    name: "Gemini 4 Argon (Experimental Flagship)",
+    wireModel: "gemini-3.8-flash-high",
+    defaultThinkingBudget: 16384,
+    description: "Google's next-generation Gemini 4 Argon preview model with deep reasoning and native multimodality.",
+    tier: "Argon / Gemini 4",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+  {
+    id: "gemini-4-argon-low",
+    name: "Gemini 4 Argon (Low)",
+    wireModel: "gemini-3.8-flash-low",
+    defaultThinkingBudget: 2048,
+    description: "Google's next-generation Gemini 4 Argon preview model with snappy 2K reasoning budget.",
+    tier: "Argon / Gemini 4",
+    speed: "Snappy",
+    contextWindow: 1048576,
+  },
+  {
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5 (Thinking)",
+    wireModel: "claude-opus-5-5-high",
+    defaultThinkingBudget: 16384,
+    description: "Anthropic's flagship Claude Opus 5.5 deep reasoning model.",
+    tier: "Claude 5.5",
+    speed: "Deep",
+    contextWindow: 1048576,
+  },
+  {
+    id: "claude-opus-5-5-low",
+    name: "Claude Opus 5.5 (Low)",
+    wireModel: "claude-opus-5-5-low",
+    defaultThinkingBudget: 2048,
+    description: "Anthropic's flagship Claude Opus 5.5 deep reasoning model with snappy 2K reasoning budget.",
+    tier: "Claude 5.5",
+    speed: "Snappy",
+    contextWindow: 1048576,
+  },
+  {
+    id: "claude-sonnet-5-5",
+    name: "Claude Sonnet 5.5 (Thinking)",
+    wireModel: "claude-sonnet-5-5-high",
+    defaultThinkingBudget: 16384,
+    description: "Anthropic's ultra-capable Claude Sonnet 5.5 model for high-speed coding and roleplay.",
+    tier: "Claude 5.5",
+    speed: "Fast",
+    contextWindow: 1048576,
+  },
+  {
+    id: "claude-sonnet-5-5-low",
+    name: "Claude Sonnet 5.5 (Low)",
+    wireModel: "claude-sonnet-5-5-low",
+    defaultThinkingBudget: 2048,
+    description: "Anthropic's ultra-capable Claude Sonnet 5.5 model with snappy 2K reasoning budget.",
+    tier: "Claude 5.5",
+    speed: "Snappy",
+    contextWindow: 1048576,
+  },
 ];
 
 export const OPENCODE_MODEL_SPECS: ModelSpec[] = OPENCODE_MODELS.map((m) => ({
@@ -154,7 +216,7 @@ export const OPENCODE_MODEL_SPECS: ModelSpec[] = OPENCODE_MODELS.map((m) => ({
 
 export const SUPPORTED_MODELS: ModelSpec[] = [...GOOGLE_SUPPORTED_MODELS, ...OPENCODE_MODEL_SPECS];
 
-export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean } | null {
+export function resolveModel(modelId: string): { wireModel: string; defaultThinkingBudget: number; isWebSearch?: boolean; targetAccount?: string; isDedicatedCohort?: boolean } | null {
   if (!modelId) return null;
   let clean = modelId.trim().toLowerCase();
 
@@ -201,10 +263,12 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   const exact = SUPPORTED_MODELS.find(m => m.id === clean);
   if (exact) {
     const isSearchModel = clean.endsWith('-search') || clean.endsWith('-web') || isWebSearch;
+    const isDedicated = exact.id.startsWith('gemini-4') || exact.id.startsWith('argon') || exact.id.includes('opus-5-5') || exact.id.includes('opus-5.5') || exact.id.includes('sonnet-5-5') || exact.id.includes('sonnet-5.5');
     return {
       wireModel: exact.wireModel,
       defaultThinkingBudget: exact.defaultThinkingBudget,
       isWebSearch: isSearchModel ? true : undefined,
+      isDedicatedCohort: isDedicated ? true : undefined,
     };
   }
 
@@ -299,6 +363,72 @@ export function resolveModel(modelId: string): { wireModel: string; defaultThink
   }
   if (clean === 'claude-opus-4-6-thinking' || clean === 'claude-opus-4-6' || clean === 'claude-opus-4.6' || clean === 'claude-opus' || clean === 'opus-4.6' || clean === 'opus-4-6') {
     return { wireModel: 'claude-opus-4-6-thinking', defaultThinkingBudget: 16384 };
+  }
+
+  // Dedicated Cohort Models (Argon & Claude 5.5)
+  if (
+    clean === 'gemini-4-argon' ||
+    clean === 'gemini-4' ||
+    clean === 'argon' ||
+    clean === 'argon-tiered' ||
+    clean === 'argon-high' ||
+    clean === 'argon-max' ||
+    clean === 'argon-medium' ||
+    clean === 'argon-low' ||
+    clean === 'argon-fast' ||
+    clean === 'gemini-4-argon-low' ||
+    clean === 'gemini-4-argon-fast' ||
+    clean === 'gemini-4-argon-high' ||
+    clean === 'gemini-4-argon-max' ||
+    clean === 'gemini-4-low' ||
+    clean === 'gemini-4-fast'
+  ) {
+    const isLow = clean.includes('low') || clean === 'gemini-4-argon-low' || clean === 'argon-low' || clean === 'gemini-4-low';
+    const isFast = clean.includes('fast');
+    const isMax = clean.includes('max');
+    const budget = isFast ? 0 : isLow ? 2048 : isMax ? 65535 : (clean.includes('high') ? 24576 : 16384);
+    const wireModel = (isLow || isFast) ? 'gemini-3.8-flash-low' : 'gemini-3.8-flash-high';
+    return { wireModel, defaultThinkingBudget: budget, targetAccount: 'acc-8', isDedicatedCohort: true };
+  }
+  if (
+    clean === 'claude-opus-5-5' ||
+    clean === 'claude-opus-5.5' ||
+    clean === 'opus-5.5' ||
+    clean === 'opus-5-5' ||
+    clean === 'claude-opus-5-5-thinking' ||
+    clean === 'opus-5.5-thinking' ||
+    clean === 'claude-opus-5-5-low' ||
+    clean === 'claude-opus-5.5-low' ||
+    clean === 'opus-5.5-low' ||
+    clean === 'opus-5-5-low' ||
+    clean === 'claude-opus-5-5-fast' ||
+    clean === 'opus-5.5-fast'
+  ) {
+    const isLow = clean.includes('low');
+    const isFast = clean.includes('fast');
+    const budget = isFast ? 0 : isLow ? 2048 : 16384;
+    const wireModel = isLow ? 'claude-opus-5-5-low' : (isFast ? 'claude-opus-5-5-low' : 'claude-opus-5-5-high');
+    return { wireModel, defaultThinkingBudget: budget, targetAccount: 'acc-8', isDedicatedCohort: true };
+  }
+  if (
+    clean === 'claude-sonnet-5-5' ||
+    clean === 'claude-sonnet-5.5' ||
+    clean === 'sonnet-5.5' ||
+    clean === 'sonnet-5-5' ||
+    clean === 'claude-sonnet-5-5-thinking' ||
+    clean === 'sonnet-5.5-thinking' ||
+    clean === 'claude-sonnet-5-5-low' ||
+    clean === 'claude-sonnet-5.5-low' ||
+    clean === 'sonnet-5.5-low' ||
+    clean === 'sonnet-5-5-low' ||
+    clean === 'claude-sonnet-5-5-fast' ||
+    clean === 'sonnet-5.5-fast'
+  ) {
+    const isLow = clean.includes('low');
+    const isFast = clean.includes('fast');
+    const budget = isFast ? 0 : isLow ? 2048 : 16384;
+    const wireModel = isLow ? 'claude-sonnet-5-5-low' : (isFast ? 'claude-sonnet-5-5-low' : 'claude-sonnet-5-5-high');
+    return { wireModel, defaultThinkingBudget: budget, targetAccount: 'acc-8', isDedicatedCohort: true };
   }
 
   // OpenAI aliases -> transparently route to Gemini 3.8 Flash tiers

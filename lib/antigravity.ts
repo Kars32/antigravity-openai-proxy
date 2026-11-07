@@ -35,8 +35,8 @@ export const UNRESTRICTED_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
 ];
 
-export const ANTIGRAVITY_USER_AGENT = 'antigravity/2.22.0 windows/amd64';
-export const ANTIGRAVITY_API_CLIENT = 'gl-node/20.18.0 gccl/2.22.0';
+export const ANTIGRAVITY_USER_AGENT = 'antigravity/2.29.0 windows/amd64';
+export const ANTIGRAVITY_API_CLIENT = 'gl-node/20.18.0 gccl/2.29.0';
 
 export function getAntigravityHeaders(accessToken?: string, accept: string = 'text/event-stream'): Record<string, string> {
   const headers: Record<string, string> = {
@@ -51,12 +51,19 @@ export function getAntigravityHeaders(accessToken?: string, accept: string = 'te
   return headers;
 }
 
-export const BANNED_ACCOUNTS = new Set<string>();
+export const BANNED_ACCOUNTS = new Set<string>([
+  'yashv3050@gmail.com',
+  'yashv3050',
+  'manishflamingopharma@gmail.com',
+  'manishflamingopharma',
+  'manishflamingo'
+]);
 
 export function isBannedAccount(name: string): boolean {
   const clean = (name || '').toLowerCase().trim();
   if (!clean) return false;
   if (BANNED_ACCOUNTS.has(clean)) return true;
+  if (clean.includes('yashv3050') || clean.includes('manishflamingo')) return true;
   return false;
 }
 
@@ -196,6 +203,18 @@ export async function getAccessToken(account: AccountConfig): Promise<string> {
       if (!account.projectId) {
         account.projectId = 'aicode-consumers';
       }
+
+      // Auto-onboard account on daily-cloudcode-pa if new
+      try {
+        await fetch('https://daily-cloudcode-pa.googleapis.com/v1internal:onboardUser', {
+          method: 'POST',
+          headers: getAntigravityHeaders(account.accessToken, 'application/json'),
+          body: JSON.stringify({
+            tierId: 'free-tier',
+            metadata: { ideType: 'ANTIGRAVITY', ideVersion: '2.29.0' }
+          })
+        });
+      } catch {}
 
       return account.accessToken as string;
     } finally {

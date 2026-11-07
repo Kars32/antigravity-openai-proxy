@@ -12,6 +12,7 @@ export default function AntigravityOpenAIControlCenter() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
 
   // Dashboard Navigation
   const [activeTab, setActiveTab] = useState<'models' | 'quickstart' | 'test' | 'accounts'>('models');
@@ -133,10 +134,14 @@ export default function AntigravityOpenAIControlCenter() {
     setStatus(null);
   };
 
-  const copyToClipboard = (text: string, field: string) => {
+  const copyToClipboard = (text: string, field: string, label = 'content') => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    setAnnouncement(`Copied ${label} to clipboard`);
+    setTimeout(() => {
+      setCopiedField(null);
+      setAnnouncement('');
+    }, 2000);
   };
 
   const handleSendTest = async () => {
@@ -227,14 +232,16 @@ export default function AntigravityOpenAIControlCenter() {
 
           <form onSubmit={(e) => { e.preventDefault(); verifyAndUnlock(loginKeyInput); }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
+              <label htmlFor="master-key-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#a1a1aa', marginBottom: 6 }}>Master Proxy Key</label>
               <input
+                id="master-key-input"
                 type="password"
                 placeholder="KARS-..."
                 value={loginKeyInput}
                 onChange={(e) => setLoginKeyInput(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 8, padding: '10px 14px', color: '#f4f4f5', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                 autoFocus
+                aria-required="true"
               />
             </div>
 
@@ -386,6 +393,15 @@ for await (const chunk of stream) {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px', minHeight: '100vh', color: '#f4f4f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* Screen reader live announcements */}
+      <div
+        role="status"
+        aria-live="polite"
+        style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}
+      >
+        {announcement}
+      </div>
+
       {/* Top Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32, borderBottom: '1px solid #27272a', paddingBottom: 20 }}>
         <div>
@@ -428,13 +444,17 @@ for await (const chunk of stream) {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => copyToClipboard(`${DOMAIN}/v1`, 'base_url')}
+            type="button"
+            onClick={() => copyToClipboard(`${DOMAIN}/v1`, 'base_url', 'Active OpenAI Base URL')}
+            aria-label={copiedField === 'base_url' ? 'Copied Active OpenAI Base URL' : 'Copy Active OpenAI Base URL'}
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
           >
             {copiedField === 'base_url' ? '✓ Copied Base URL' : '📋 Copy Base URL'}
           </button>
           <button
-            onClick={() => copyToClipboard(apiKey, 'key')}
+            type="button"
+            onClick={() => copyToClipboard(apiKey, 'key', 'Master API Key')}
+            aria-label={copiedField === 'key' ? 'Copied Master API Key' : 'Copy Master API Key'}
             style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
           >
             {copiedField === 'key' ? '✓ Copied API Key' : '🔑 Copy API Key'}
@@ -443,7 +463,7 @@ for await (const chunk of stream) {
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
+      <div role="tablist" aria-label="Dashboard sections" style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid #1f1f23', paddingBottom: 12 }}>
         {[
           { id: 'models', label: '🧠 Native Antigravity Models' },
           { id: 'quickstart', label: '⚡ Quickstart & Code' },
@@ -452,6 +472,11 @@ for await (const chunk of stream) {
         ].map(tab => (
           <button
             key={tab.id}
+            id={`tab-${tab.id}`}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             onClick={() => setActiveTab(tab.id as any)}
             style={{
               backgroundColor: activeTab === tab.id ? '#27272a' : 'transparent',
@@ -471,7 +496,7 @@ for await (const chunk of stream) {
 
       {/* TAB 1: Models Catalog */}
       {activeTab === 'models' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div id="panel-models" role="tabpanel" aria-labelledby="tab-models" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {NATIVE_ANTIGRAVITY_MODELS.map(group => (
             <div key={group.group}>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
@@ -498,10 +523,12 @@ for await (const chunk of stream) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #1f1f23' }}>
                       <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
                       <button
-                        onClick={() => copyToClipboard(m.id, m.id)}
+                        type="button"
+                        onClick={() => copyToClipboard(m.id, m.id, `model ID ${m.id}`)}
+                        aria-label={copiedField === m.id ? `Copied model ID ${m.id}` : `Copy model ID ${m.id}`}
                         style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
                       >
-                        {copiedField === m.id ? '✓' : 'Copy'}
+                        {copiedField === m.id ? '✓ Copied' : 'Copy'}
                       </button>
                     </div>
                   </div>
@@ -514,9 +541,9 @@ for await (const chunk of stream) {
 
       {/* TAB 2: Quickstart Code Snippets */}
       {activeTab === 'quickstart' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-quickstart" role="tabpanel" aria-labelledby="tab-quickstart" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div role="tablist" aria-label="Quickstart languages" style={{ display: 'flex', gap: 6 }}>
               {[
                 { id: 'python', label: 'Python SDK' },
                 { id: 'curl', label: 'cURL' },
@@ -524,6 +551,11 @@ for await (const chunk of stream) {
               ].map(st => (
                 <button
                   key={st.id}
+                  id={`subtab-${st.id}`}
+                  role="tab"
+                  aria-selected={codeTab === st.id}
+                  aria-controls={`subpanel-${st.id}`}
+                  tabIndex={codeTab === st.id ? 0 : -1}
                   onClick={() => setCodeTab(st.id as any)}
                   style={{
                     backgroundColor: codeTab === st.id ? '#27272a' : 'transparent',
@@ -541,10 +573,12 @@ for await (const chunk of stream) {
               ))}
             </div>
             <button
+              type="button"
               onClick={() => {
                 const code = codeTab === 'python' ? pythonCode : codeTab === 'curl' ? curlCode : nodeCode;
-                copyToClipboard(code, 'code');
+                copyToClipboard(code, 'code', `${codeTab} code snippet`);
               }}
+              aria-label={copiedField === 'code' ? `Copied ${codeTab} code snippet` : `Copy ${codeTab} code snippet`}
               style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
             >
               {copiedField === 'code' ? '✓ Copied' : 'Copy Snippet'}
@@ -559,13 +593,14 @@ for await (const chunk of stream) {
 
       {/* TAB 3: Interactive Testing Console */}
       {activeTab === 'test' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div id="panel-test" role="tabpanel" aria-labelledby="tab-test" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,8 +650,9 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <label htmlFor="prompt-input" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
               <textarea
+                id="prompt-input"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
@@ -669,7 +705,7 @@ for await (const chunk of stream) {
 
       {/* TAB 4: Account Pool Health */}
       {activeTab === 'accounts' && (
-        <div style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
+        <div id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts" style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 12, padding: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px 0' }}>Google Account Pool & Rate Limit Failover</h2>
           <p style={{ fontSize: 13, color: '#a1a1aa', margin: '0 0 20px 0' }}>
             Generation requests are automatically distributed 50/50 across active Google OAuth accounts.

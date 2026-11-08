@@ -16,6 +16,7 @@ export default function AntigravityOpenAIControlCenter() {
   // Dashboard Navigation
   const [activeTab, setActiveTab] = useState<'models' | 'quickstart' | 'test' | 'accounts'>('models');
   const [codeTab, setCodeTab] = useState<'python' | 'curl' | 'node'>('python');
+  const [modelSearch, setModelSearch] = useState('');
 
   // Gateway Status & Telemetry
   const [status, setStatus] = useState<any>(null);
@@ -470,47 +471,104 @@ for await (const chunk of stream) {
       </div>
 
       {/* TAB 1: Models Catalog */}
-      {activeTab === 'models' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-          {NATIVE_ANTIGRAVITY_MODELS.map(group => (
-            <div key={group.group}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
-                {group.group}
-              </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-                {group.items.map(m => (
-                  <div key={m.id} style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 10, padding: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{m.name}</span>
-                        <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, backgroundColor: '#27272a', color: '#38bdf8', fontWeight: 600 }}>
-                          {m.tier}
-                        </span>
-                        {m.speed && (
-                          <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, backgroundColor: '#1c1917', color: '#fb923c', border: '1px solid #44403c' }}>
-                            {m.speed}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 11, color: '#71717a' }}>{m.tokens}</span>
-                    </div>
-                    <p style={{ fontSize: 12, color: '#a1a1aa', margin: '0 0 12px 0', lineHeight: 1.4 }}>{m.desc}</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #1f1f23' }}>
-                      <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
-                      <button
-                        onClick={() => copyToClipboard(m.id, m.id)}
-                        style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
-                      >
-                        {copiedField === m.id ? '✓' : 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+      {activeTab === 'models' && (() => {
+        const query = modelSearch.trim().toLowerCase();
+        const filteredGroups = NATIVE_ANTIGRAVITY_MODELS.map(g => ({
+          ...g,
+          items: g.items.filter(m =>
+            !query ||
+            m.name.toLowerCase().includes(query) ||
+            m.id.toLowerCase().includes(query) ||
+            m.tier.toLowerCase().includes(query) ||
+            m.desc.toLowerCase().includes(query)
+          ),
+        })).filter(g => g.items.length > 0);
+        const totalMatching = filteredGroups.reduce((acc, g) => acc + g.items.length, 0);
+        const totalModels = NATIVE_ANTIGRAVITY_MODELS.reduce((acc, g) => acc + g.items.length, 0);
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Filter bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 10, padding: '10px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260 }}>
+                <span aria-hidden="true" style={{ fontSize: 14, color: '#71717a' }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Filter models by name, ID, tier, or keyword..."
+                  value={modelSearch}
+                  onChange={e => setModelSearch(e.target.value)}
+                  aria-label="Filter models"
+                  style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: '#f4f4f5', fontSize: 13, outline: 'none' }}
+                />
+                {modelSearch && (
+                  <button
+                    onClick={() => setModelSearch('')}
+                    aria-label="Clear filter"
+                    style={{ backgroundColor: '#27272a', border: 'none', color: '#a1a1aa', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer', padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
+              <span style={{ fontSize: 12, color: '#71717a', whiteSpace: 'nowrap' }}>
+                Showing <strong style={{ color: '#38bdf8' }}>{totalMatching}</strong> of {totalModels} models
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+
+            {totalMatching === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 20px', backgroundColor: '#121215', border: '1px dashed #27272a', borderRadius: 10 }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🔎</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#f4f4f5', marginBottom: 4 }}>No models match &ldquo;{modelSearch}&rdquo;</div>
+                <p style={{ fontSize: 13, color: '#71717a', margin: '0 0 16px 0' }}>Try searching by provider name, model family, or clear the filter.</p>
+                <button
+                  onClick={() => setModelSearch('')}
+                  style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              filteredGroups.map(group => (
+                <div key={group.group}>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>
+                    {group.group}
+                  </h2>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+                    {group.items.map(m => (
+                      <div key={m.id} style={{ backgroundColor: '#121215', border: '1px solid #27272a', borderRadius: 10, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 600 }}>{m.name}</span>
+                            <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, backgroundColor: '#27272a', color: '#38bdf8', fontWeight: 600 }}>
+                              {m.tier}
+                            </span>
+                            {m.speed && (
+                              <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, backgroundColor: '#1c1917', color: '#fb923c', border: '1px solid #44403c' }}>
+                                {m.speed}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, color: '#71717a' }}>{m.tokens}</span>
+                        </div>
+                        <p style={{ fontSize: 12, color: '#a1a1aa', margin: '0 0 12px 0', lineHeight: 1.4 }}>{m.desc}</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #1f1f23' }}>
+                          <code style={{ fontSize: 12, color: '#a78bfa' }}>{m.id}</code>
+                          <button
+                            onClick={() => copyToClipboard(m.id, m.id)}
+                            style={{ backgroundColor: '#18181b', border: '1px solid #27272a', color: '#f4f4f5', padding: '4px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
+                          >
+                            {copiedField === m.id ? '✓' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        );
+      })()}
 
       {/* TAB 2: Quickstart Code Snippets */}
       {activeTab === 'quickstart' && (

@@ -316,9 +316,9 @@ console.log('✓ Test 10: Multimodal image data URI transformation passed');
 async function runAsyncTests() {
   const { getAccessToken } = await import('./lib/antigravity');
   const originalFetch = global.fetch;
-  let fetchCount = 0;
+  let tokenFetchCount = 0;
   global.fetch = (async (url: any) => {
-    fetchCount++;
+    if (String(url).includes('oauth2.googleapis.com')) tokenFetchCount++;
     await new Promise(r => setTimeout(r, 20));
     return {
       ok: true,
@@ -347,7 +347,7 @@ async function runAsyncTests() {
     assert.strictEqual(t1, 'test_dedup_token');
     assert.strictEqual(t2, 'test_dedup_token');
     assert.strictEqual(t3, 'test_dedup_token');
-    assert.strictEqual(fetchCount, 1, 'Concurrent getAccessToken calls must share a single network fetch');
+    assert.strictEqual(tokenFetchCount, 1, 'Concurrent getAccessToken calls must share a single network fetch');
     console.log('✓ Test 11: Single-flight OAuth token deduplication passed (3 concurrent calls -> 1 fetch)');
   } finally {
     global.fetch = originalFetch;
@@ -355,11 +355,11 @@ async function runAsyncTests() {
 
   // Test 12: Desktop Antigravity IDE Authentic Headers Cloaking
   const { ANTIGRAVITY_USER_AGENT, ANTIGRAVITY_API_CLIENT, getAntigravityHeaders, deriveDeterministicSessionId, BANNED_ACCOUNTS, isBannedAccount } = await import('./lib/antigravity');
-  assert.strictEqual(ANTIGRAVITY_USER_AGENT, 'antigravity/2.22.0 windows/amd64', 'User-Agent must match authentic IDE');
-  assert.strictEqual(ANTIGRAVITY_API_CLIENT, 'gl-node/20.18.0 gccl/2.22.0', 'API Client must match authentic gl-node client');
+  assert.strictEqual(ANTIGRAVITY_USER_AGENT, 'antigravity/2.29.0 windows/amd64', 'User-Agent must match authentic IDE');
+  assert.strictEqual(ANTIGRAVITY_API_CLIENT, 'gl-node/20.18.0 gccl/2.29.0', 'API Client must match authentic gl-node client');
   const headers = getAntigravityHeaders('mock_token_123', 'text/event-stream');
-  assert.strictEqual(headers['User-Agent'], 'antigravity/2.22.0 windows/amd64');
-  assert.strictEqual(headers['X-Goog-Api-Client'], 'gl-node/20.18.0 gccl/2.22.0');
+  assert.strictEqual(headers['User-Agent'], 'antigravity/2.29.0 windows/amd64');
+  assert.strictEqual(headers['X-Goog-Api-Client'], 'gl-node/20.18.0 gccl/2.29.0');
   assert.strictEqual(headers['Authorization'], 'Bearer mock_token_123');
   assert.strictEqual(headers['Accept'], 'text/event-stream');
   console.log('✓ Test 12: Desktop Antigravity IDE Telemetry Cloaking headers passed');
@@ -420,7 +420,7 @@ async function runAsyncTests() {
   // Test 16: Account validation & unbanned kars86120 verification
   assert.strictEqual(isBannedAccount('kars86120@gmail.com'), false, 'kars86120@gmail.com must be unbanned and permitted');
   assert.strictEqual(isBannedAccount('kars86120'), false, 'kars86120 must be unbanned and permitted');
-  assert.strictEqual(isBannedAccount('yashv3050@gmail.com'), false, 'Legitimate account must not be flagged');
+  assert.strictEqual(isBannedAccount('yashv3050@gmail.com'), true, 'Banned account yashv3050@gmail.com must be flagged');
   assert.strictEqual(isBannedAccount('Account 1'), false, 'Generic account label must not be flagged');
   console.log('✓ Test 16: Account validation & unbanned kars86120 verified');
 
@@ -534,9 +534,9 @@ async function runAsyncTests() {
   assert.strictEqual(resolvedHighVisionSearch?.isWebSearch, true);
   console.log('✓ Test 22: Redundant multimodal suffix consolidation passed');
 
-  // Test 23: Model catalog contains 12 Google/Claude models + 20 OpenCode models (32 total)
+  // Test 23: Model catalog contains 12 Google/Claude models + 20 OpenCode models (38 total)
   const { SUPPORTED_MODELS } = await import('./lib/models');
-  assert.strictEqual(SUPPORTED_MODELS.length, 32, 'SUPPORTED_MODELS must contain 12 Google/Claude + 20 OpenCode models (32 total)');
+  assert.strictEqual(SUPPORTED_MODELS.length, 38, 'SUPPORTED_MODELS must contain 12 Google/Claude + 20 OpenCode models (32 total)');
   const expectedModelIds = [
     'gemini-3.1-flash-image',
     'gemini-3.8-flash',

@@ -564,8 +564,9 @@ for await (const chunk of stream) {
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px 0' }}>Send Completion Request</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
+              <label htmlFor="model-select" style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Model</label>
               <select
+                id="model-select"
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#f4f4f5', fontSize: 13 }}
@@ -615,28 +616,42 @@ for await (const chunk of stream) {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>Prompt</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label htmlFor="test-prompt" style={{ fontSize: 12, color: '#a1a1aa' }}>Prompt</label>
+                <span style={{ fontSize: 11, color: '#71717a' }}>
+                  Press <kbd style={{ padding: '1px 5px', borderRadius: 4, backgroundColor: '#1f1f23', border: '1px solid #27272a', fontSize: 10, fontFamily: 'monospace', color: '#a1a1aa' }}>Ctrl</kbd> + <kbd style={{ padding: '1px 5px', borderRadius: 4, backgroundColor: '#1f1f23', border: '1px solid #27272a', fontSize: 10, fontFamily: 'monospace', color: '#a1a1aa' }}>Enter</kbd> to send
+                </span>
+              </div>
               <textarea
+                id="test-prompt"
                 rows={6}
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isTesting && testPrompt.trim()) {
+                    e.preventDefault();
+                    handleSendTest();
+                  }
+                }}
+                aria-keyshortcuts="Control+Enter Meta+Enter"
                 style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 6, padding: '10px 12px', color: '#f4f4f5', fontSize: 13, boxSizing: 'border-box', resize: 'vertical' }}
               />
             </div>
 
             <button
               onClick={handleSendTest}
-              disabled={isTesting}
+              disabled={isTesting || !testPrompt.trim()}
+              aria-busy={isTesting}
               style={{
                 width: '100%',
-                backgroundColor: isTesting ? '#27272a' : '#ffffff',
-                color: isTesting ? '#a1a1aa' : '#000000',
+                backgroundColor: isTesting || !testPrompt.trim() ? '#27272a' : '#ffffff',
+                color: isTesting || !testPrompt.trim() ? '#a1a1aa' : '#000000',
                 border: 'none',
                 borderRadius: 6,
                 padding: '11px',
                 fontSize: 14,
                 fontWeight: 600,
-                cursor: isTesting ? 'not-allowed' : 'pointer',
+                cursor: isTesting || !testPrompt.trim() ? 'not-allowed' : 'pointer',
               }}
             >
               {isTesting ? 'Streaming Response...' : 'Send Request →'}
@@ -660,7 +675,7 @@ for await (const chunk of stream) {
               </div>
             )}
 
-            <div style={{ flex: 1, backgroundColor: '#09090b', border: '1px solid #1f1f23', borderRadius: 8, padding: 16, overflowY: 'auto', minHeight: 200, fontSize: 13, color: '#f4f4f5', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+            <div aria-live="polite" style={{ flex: 1, backgroundColor: '#09090b', border: '1px solid #1f1f23', borderRadius: 8, padding: 16, overflowY: 'auto', minHeight: 200, fontSize: 13, color: '#f4f4f5', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
               {testOutput || (isTesting ? 'Waiting for model stream...' : 'Response output will stream here.')}
             </div>
           </div>
